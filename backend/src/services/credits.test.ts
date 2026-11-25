@@ -16,7 +16,7 @@ function err<T>(r: ApiResult<T>) {
 const as = (deps: Deps, email: string) => deps.setActiveEmail(email);
 let n = 0;
 const key = () => `00000000-0000-4000-9000-${(++n).toString(16).padStart(12, '0')}`;
-const file = (deps: Deps, email: string, leaveType: string, dates: string[], details: Record<string, string> = {}) => {
+const file = (deps: Deps, email: string, leaveType: string, dates: string[], details: Record<string, string> = leaveType === 'WELLNESS' ? { purpose: 'Rest and recovery' } : {}) => {
   as(deps, email);
   return endpoints.api_fileLeave(deps, { idempotencyKey: key(), form: { leaveType, details, dates, commutation: 'NOT_REQUESTED' } });
 };
@@ -128,5 +128,34 @@ describe('who manages credits', () => {
     ok(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-02', hours: 8, reference: 'OT-1' }));
     as(deps, PEOPLE.staff);
     expect(err(endpoints.api_listCredits(deps, {})).code).toBe('FORBIDDEN');
+  });
+});
+
+describe('wellness leave form', () => {
+  it('prints wellness leave on FORM-ASHRDD-031 with the purpose and, once certified, the days left', () => {
+    const deps = seededDeps();
+    const app = ok(file(deps, PEOPLE.cos, 'WELLNESS', ['2026-12-07', '2026-12-08'], { purpose: 'Rest and recovery' }));
+    as(deps, PEOPLE.cos);
+    const before = ok(endpoints.api_formHtml(deps, { applicationId: app.applicationId }));
+    expect(before.fileName).toContain('Wellness Leave Application');
+    expect(before.html).toContain('FORM-ASHRDD-031');
+    expect(before.html).toContain('Rest and recovery');
+    expect(before.html).toContain('2 days');
+    expect(before.html).not.toContain('APPLICATION FOR LEAVE');
+    expect(before.html).not.toContain('3 days');
+    // The Supervising AO certifies: the form now shows 3 days left.
+    as(deps, PEOPLE.chief);
+    let a = ok(endpoints.api_getApplication(deps, { applicationId: app.applicationId }));
+    ok(endpoints.api_sign(deps, { applicationId: app.applicationId, version: a.version, method: 'PAPER', decision: 'FOR_APPROVAL' }));
+    as(deps, PEOPLE.ao);
+    a = ok(endpoints.api_getApplication(deps, { applicationId: app.applicationId }));
+    ok(endpoints.api_sign(deps, { applicationId: app.applicationId, version: a.version, method: 'PAPER', decision: 'CERTIFIED' }));
+    as(deps, PEOPLE.cos);
+    expect(ok(endpoints.api_formHtml(deps, { applicationId: app.applicationId })).html).toContain('3 days');
+  });
+
+  it('asks for the purpose of wellness leave', () => {
+    const deps = seededDeps();
+    expect(err(file(deps, PEOPLE.cos, 'WELLNESS', ['2026-12-07'], {})).message).toContain('purpose');
   });
 });

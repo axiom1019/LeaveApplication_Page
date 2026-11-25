@@ -330,6 +330,7 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
       ILLNESS: ['illness'],
       STUDY: ['study'],
       OTHER: ['otherPurpose'],
+      PURPOSE: ['purpose'],
       NONE: [],
     };
     for (const k of Object.keys(details) as (keyof typeof details)[]) if (!keep[kind]?.includes(k)) delete details[k];

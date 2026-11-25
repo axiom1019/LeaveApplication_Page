@@ -24,6 +24,8 @@ export const leaveDetails = z.object({
   illness: text(200).optional(),
   study: z.enum(['MASTERS', 'BAR']).optional(),
   otherPurpose: z.enum(['MONETIZATION', 'TERMINAL']).optional(),
+  /** Wellness leave: "Purpose of Leave" on FORM-ASHRDD-031. */
+  purpose: text(300).optional(),
 });
 export type LeaveDetails = z.infer<typeof leaveDetails>;
 
@@ -48,6 +50,7 @@ export const leaveForm = z
         ctx.addIssue({ code: 'custom', path: ['details', 'locationText'], message: 'Specify the country' });
       }
     }
+    if (v.leaveType === 'WELLNESS' && !v.details.purpose) ctx.addIssue({ code: 'custom', path: ['details', 'purpose'], message: 'State the purpose of the leave' });
     if (v.leaveType === 'STUDY' && !v.details.study) ctx.addIssue({ code: 'custom', path: ['details', 'study'], message: 'Choose the purpose of the study leave' });
   });
 export type LeaveForm = z.infer<typeof leaveForm>;

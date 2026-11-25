@@ -15,9 +15,10 @@ export const LEAVE_TYPES = [
   { code: 'ADOPT', label: 'Adoption Leave', basis: 'R.A. No. 8552', details: 'NONE', for: 'REGULAR' },
   { code: 'OTHERS', label: 'Others', basis: '', details: 'OTHER', for: 'REGULAR' },
   // Contract of service workers are not covered by the CSC leave rules. DHSUD Region 10 gives them
-  // these two; both print under 6.A "Others" with the name written in.
+  // these two. CTO prints under 6.A "Others" on CSC Form No. 6; Wellness Leave prints on the
+  // region's own form, FORM-ASHRDD-031 (see backend/src/services/wellnessForm.ts).
   { code: 'CTO', label: 'Compensatory Time-Off (CTO)', basis: '', details: 'NONE', for: 'COS' },
-  { code: 'WELLNESS', label: 'Wellness Leave', basis: '', details: 'NONE', for: 'COS' },
+  { code: 'WELLNESS', label: 'Wellness Leave', basis: '', details: 'PURPOSE', for: 'COS' },
 ] as const;
 
 export type LeaveTypeCode = (typeof LEAVE_TYPES)[number]['code'];

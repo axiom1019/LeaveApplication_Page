@@ -361,7 +361,7 @@ describe('privacy in emails', () => {
       endpoints.api_fileLeave(deps, {
         token,
         idempotencyKey: key(),
-        form: { leaveType: 'WELLNESS', details: {}, dates: ['2026-12-07'], commutation: 'NOT_REQUESTED' },
+        form: { leaveType: 'WELLNESS', details: { purpose: 'Rest' }, dates: ['2026-12-07'], commutation: 'NOT_REQUESTED' },
       }),
     );
     ok(signAs(deps, PEOPLE.chief, app.applicationId, 'FOR_APPROVAL'));

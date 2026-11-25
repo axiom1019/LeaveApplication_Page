@@ -192,6 +192,11 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
               {errors['details.study'] && <div className="err small" style={{ color: 'var(--red)' }}>{errors['details.study']}</div>}
             </div>
           )}
+          {kind === 'PURPOSE' && (
+            <Field label="Purpose of leave" error={errors['details.purpose']} hint="Prints on the Wellness Leave form (FORM-ASHRDD-031).">
+              <textarea value={details.purpose ?? ''} onChange={(ev) => set({ purpose: ev.target.value })} maxLength={300} />
+            </Field>
+          )}
           {kind === 'OTHER' && (
             <div className="choices">
               <span className="small muted">Other purpose (optional)</span>

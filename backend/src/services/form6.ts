@@ -28,11 +28,11 @@ export interface Form6View {
   sealBase64?: string | null;
 }
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const box = (on: boolean) => `<span class="cb">${on ? 'X' : '&nbsp;'}</span>`;
 const line = (v: string, width = '100%') => `<span class="ln" style="width:${width}">${v ? esc(v) : '&nbsp;'}</span>`;
 
-function signatureBlock(v: SectionView | undefined, caption: string): string {
+export function signatureBlock(v: SectionView | undefined, caption: string): string {
   const sig = v?.signature ?? null;
   let mark = '&nbsp;';
   if (sig?.method === 'ESIGN' && v?.imageBase64) {
