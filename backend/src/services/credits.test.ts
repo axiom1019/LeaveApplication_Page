@@ -112,3 +112,21 @@ describe('leave credits', () => {
     expect(ok(endpoints.api_listCredits(deps, {})).length).toBeGreaterThan(5);
   });
 });
+
+describe('who manages credits', () => {
+  it('lets HR and the administrator change credits, and the Supervising AO only look', () => {
+    const deps = seededDeps();
+    const staff = deps.ids.staff;
+    const input = { employeeId: staff, asOf: '2026-10-31', vlBalance: 10, slBalance: 12 };
+    as(deps, PEOPLE.ao);
+    expect(ok(endpoints.api_listCredits(deps, {})).length).toBeGreaterThan(0);
+    expect(err(endpoints.api_saveCredits(deps, input)).code).toBe('FORBIDDEN');
+    expect(err(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-02', hours: 8, reference: 'OT-1' })).code).toBe('FORBIDDEN');
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_saveCredits(deps, input));
+    as(deps, PEOPLE.owner);
+    ok(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-02', hours: 8, reference: 'OT-1' }));
+    as(deps, PEOPLE.staff);
+    expect(err(endpoints.api_listCredits(deps, {})).code).toBe('FORBIDDEN');
+  });
+});

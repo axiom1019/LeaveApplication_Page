@@ -142,10 +142,12 @@ export function myCredits(deps: Deps, c: Caller): CreditsDto {
   return creditsFor(db, e, loadDivisions(db), today(deps));
 }
 
-const canManage = (c: Caller) => requireRole(c, 'HR', 'ADMIN', 'SUPERVISING_AO');
+/** HR and the administrator see and change everyone's credits; the Supervising AO may look (for 7.A) but not change them. */
+const canView = (c: Caller) => requireRole(c, 'HR', 'ADMIN', 'SUPERVISING_AO');
+const canManage = (c: Caller) => requireRole(c, 'HR', 'ADMIN');
 
 export function listCredits(deps: Deps, c: Caller): CreditsDto[] {
-  canManage(c);
+  canView(c);
   const db = deps.db.get();
   const divisions = loadDivisions(db);
   const apps = db.readAll('Applications').map(toApplication);
@@ -170,7 +172,7 @@ export function saveCredits(deps: Deps, c: Caller, input: { employeeId: string; 
 }
 
 export function listCoc(deps: Deps, c: Caller, employeeId: string): CocDto[] {
-  canManage(c);
+  canView(c);
   const db = deps.db.get();
   const entries = cocEntries(db, employeeId);
   const approvedCto = db.readAll('Applications').map(toApplication).filter((a) => a.applicantId === employeeId && a.leaveType === 'CTO' && a.status === 'APPROVED');

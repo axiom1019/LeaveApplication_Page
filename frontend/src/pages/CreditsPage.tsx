@@ -5,11 +5,13 @@ import { formatLongDate } from '@shared/dates';
 import { api, errorText, fieldErrors } from '../api/client';
 import { CreditsTable, creditsCaption } from '../components/CreditsTable';
 import { Field, Loading, Modal, useLoad } from '../components/ui';
+import { useSession } from '../session';
 
 const avail = (c: CreditsDto, code: string) => c.lines.find((l) => l.code === code)?.available;
-const cell = (n: number | undefined) => (n === undefined ? '' : <span className={n <= 0 ? 'neg' : undefined}>{Number.isInteger(n) ? n : n.toFixed(3).replace(/0+$/, '')}</span>);
+const cell = (n: number | undefined) =>
+  n === undefined ? '' : <span className={n <= 0 ? 'neg' : undefined}>{Number.isInteger(n) ? n : n.toFixed(3).replace(/0+$/, '')}</span>;
 
-/** HR, administrators and the Supervising AO: every active employee's leave credits. */
+/** HR and administrators see and change every active employee's leave credits; the Supervising AO only looks. */
 export function CreditsPage() {
   const list = useLoad(() => api('api_listCredits'));
   const [q, setQ] = useState('');
@@ -22,7 +24,10 @@ export function CreditsPage() {
       <div className="page-head">
         <div>
           <h1>Leave credits</h1>
-          <p>Available leave for every staff member, in working days. Enter each regular employee's balance from the leave card once; the app adds 1.25 days of VL and SL a month and deducts approved leave. For COS staff, record their approved COCs.</p>
+          <p>
+            Available leave for every staff member, in working days. Enter each regular employee's balance from the leave card once; the app adds 1.25 days of
+            VL and SL a month and deducts approved leave. For COS staff, record their approved COCs.
+          </p>
         </div>
       </div>
       <div className="filters">
@@ -122,6 +127,7 @@ export function CreditsPage() {
 }
 
 function CreditsDialog(props: { credits: CreditsDto; onClose: () => void; onChanged: (all?: CreditsDto[]) => void }) {
+  const canEdit = useSession().has('HR', 'ADMIN');
   const [c, setC] = useState(props.credits);
   const refresh = async () => {
     const all = await api('api_listCredits');
@@ -146,7 +152,13 @@ function CreditsDialog(props: { credits: CreditsDto; onClose: () => void; onChan
       <p className="small muted" style={{ marginTop: -8, marginBottom: 20 }}>
         {creditsCaption(c)}
       </p>
-      {c.employmentType === 'COS' ? <CocLedger employeeId={c.employeeId} onChanged={refresh} /> : <BalanceForm credits={c} onSaved={refresh} />}
+      {c.employmentType === 'COS' ? (
+        <CocLedger employeeId={c.employeeId} onChanged={refresh} canEdit={canEdit} />
+      ) : canEdit ? (
+        <BalanceForm credits={c} onSaved={refresh} />
+      ) : (
+        <p className="small muted">Only HR and the administrator can change balances.</p>
+      )}
     </Modal>
   );
 }
@@ -192,7 +204,7 @@ function BalanceForm(props: { credits: CreditsDto; onSaved: () => Promise<void> 
   );
 }
 
-function CocLedger(props: { employeeId: string; onChanged: () => Promise<void> }) {
+function CocLedger(props: { employeeId: string; onChanged: () => Promise<void>; canEdit: boolean }) {
   const list = useLoad<CocDto[]>(() => api('api_listCoc', { employeeId: props.employeeId }), [props.employeeId]);
   const [f, setF] = useState({ earnedOn: '', hours: '', reference: '' });
   const [err, setErr] = useState('');
@@ -201,37 +213,39 @@ function CocLedger(props: { employeeId: string; onChanged: () => Promise<void> }
     <>
       <div className="section-title">Compensatory overtime credits (COC)</div>
       {err && <div className="form-err">{err}</div>}
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          try {
-            list.setData(await api('api_saveCoc', { employeeId: props.employeeId, earnedOn: f.earnedOn, hours: Number(f.hours), reference: f.reference }));
-            setF({ earnedOn: '', hours: '', reference: '' });
-            setErr('');
-            setErrors({});
-            await props.onChanged();
-          } catch (x) {
-            setErr(errorText(x));
-            setErrors(fieldErrors(x));
-          }
-        }}
-      >
-        <div className="cols-3">
-          <Field label="Date earned" error={errors.earnedOn}>
-            <input type="date" value={f.earnedOn} onChange={(e) => setF({ ...f, earnedOn: e.target.value })} required />
-          </Field>
-          <Field label="Hours" error={errors.hours} hint="8 hours = 1 day of CTO">
-            <input type="number" step="0.5" min="0.5" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} required />
-          </Field>
-          <Field label="Reference" error={errors.reference} hint="Overtime authority or COC certificate">
-            <input type="text" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} maxLength={200} required />
-          </Field>
-        </div>
-        <button className="btn primary" type="submit" style={{ marginBottom: 16 }}>
-          <Plus size={16} aria-hidden />
-          Add COC
-        </button>
-      </form>
+      {props.canEdit && (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              list.setData(await api('api_saveCoc', { employeeId: props.employeeId, earnedOn: f.earnedOn, hours: Number(f.hours), reference: f.reference }));
+              setF({ earnedOn: '', hours: '', reference: '' });
+              setErr('');
+              setErrors({});
+              await props.onChanged();
+            } catch (x) {
+              setErr(errorText(x));
+              setErrors(fieldErrors(x));
+            }
+          }}
+        >
+          <div className="cols-3">
+            <Field label="Date earned" error={errors.earnedOn}>
+              <input type="date" value={f.earnedOn} onChange={(e) => setF({ ...f, earnedOn: e.target.value })} required />
+            </Field>
+            <Field label="Hours" error={errors.hours} hint="8 hours = 1 day of CTO">
+              <input type="number" step="0.5" min="0.5" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} required />
+            </Field>
+            <Field label="Reference" error={errors.reference} hint="Overtime authority or COC certificate">
+              <input type="text" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} maxLength={200} required />
+            </Field>
+          </div>
+          <button className="btn primary" type="submit" style={{ marginBottom: 16 }}>
+            <Plus size={16} aria-hidden />
+            Add COC
+          </button>
+        </form>
+      )}
       {list.data ? (
         list.data.length === 0 ? (
           <p className="small muted">No COC recorded yet.</p>
@@ -257,20 +271,22 @@ function CocLedger(props: { employeeId: string; onChanged: () => Promise<void> }
                     <td className="small">{formatLongDate(x.expiresOn)}</td>
                     <td className="small">{x.reference}</td>
                     <td>
-                      <button
-                        className="btn"
-                        aria-label="Remove this COC"
-                        onClick={async () => {
-                          try {
-                            list.setData(await api('api_deleteCoc', { entryId: x.entryId }));
-                            await props.onChanged();
-                          } catch (e2) {
-                            setErr(errorText(e2));
-                          }
-                        }}
-                      >
-                        <Trash2 size={16} aria-hidden />
-                      </button>
+                      {props.canEdit && (
+                        <button
+                          className="btn"
+                          aria-label="Remove this COC"
+                          onClick={async () => {
+                            try {
+                              list.setData(await api('api_deleteCoc', { entryId: x.entryId }));
+                              await props.onChanged();
+                            } catch (e2) {
+                              setErr(errorText(e2));
+                            }
+                          }}
+                        >
+                          <Trash2 size={16} aria-hidden />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
