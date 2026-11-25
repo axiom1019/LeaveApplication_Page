@@ -173,8 +173,8 @@ function EmployeeForm(props: { person: EmployeeDto | null; divisions: DivisionDt
         Everyone can file their own leave. The Division Chief signs for the division they are set as chief of (Settings → Divisions).
       </p>
       <div className="type-grid">
-        {ROLES.filter((r) => r !== 'DIVISION_CHIEF').map((r) => {
-          const locked = (r === 'HR' || r === 'ADMIN') && !isAdmin;
+        {ROLES.filter((r) => r !== 'DIVISION_CHIEF' && r !== 'ADMIN').map((r) => {
+          const locked = r === 'HR' && !isAdmin;
           return (
             <label key={r} className="choice" style={locked ? { opacity: 0.6 } : undefined}>
               <input

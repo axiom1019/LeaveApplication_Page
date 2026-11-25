@@ -1,4 +1,5 @@
 import type { CreditsDto, DivisionDto, EmployeeDto, OicDto, SettingsDto } from '@shared/api';
+import type { Role } from '@shared/constants';
 import type { SaveEmployeeInput, SaveMyProfileInput, SettingsInput } from '@shared/schemas';
 import type { Deps } from '../platform/types';
 import { audit } from './audit';
@@ -33,7 +34,7 @@ export function listEmployees(deps: Deps, c: Caller): EmployeeDto[] {
 /** Short list for signatories and HR pickers (name + id), visible to HR, admin and the RD. */
 export function saveEmployee(deps: Deps, c: Caller, input: SaveEmployeeInput): EmployeeDto {
   requireRole(c, 'HR', 'ADMIN');
-  // Only an administrator can grant or remove the HR and ADMIN roles.
+  // Only an administrator can grant or remove the HR role; nobody grants ADMIN here.
   return deps.lock.run(() => {
     const db = deps.db.get();
     const divisions = loadDivisions(db);
@@ -47,12 +48,12 @@ export function saveEmployee(deps: Deps, c: Caller, input: SaveEmployeeInput): E
     if (input.employeeId && !prev) throw new AppError('NOT_FOUND', 'Employee not found.');
     if (prev && input.version !== undefined && prev.version !== input.version) throw new AppError('STALE_VERSION', 'Someone else changed this record. Reload and try again.');
 
-    const privileged = (roles: readonly string[]) => roles.filter((r) => r === 'HR' || r === 'ADMIN').sort().join(',');
-    if (!c.roles.has('ADMIN') && privileged(input.roles) !== privileged(prev?.roles ?? [])) {
-      throw new AppError('FORBIDDEN', 'Only the system administrator can give or remove the HR and administrator roles.');
-    }
-    if (prev && prev.employeeId === c.employee.employeeId && prev.roles.includes('ADMIN') && !input.roles.includes('ADMIN') && !c.isOwner) {
-      throw new AppError('VALIDATION', 'You cannot remove your own administrator role.');
+    // The administrator role is not given or removed here: setup gives it to the owner account and
+    // the addresses in admins.local.json. Whoever has it keeps it.
+    const roles: Role[] = [...new Set(input.roles.filter((r) => r !== 'ADMIN'))];
+    if (prev?.roles.includes('ADMIN')) roles.push('ADMIN');
+    if (!c.roles.has('ADMIN') && roles.includes('HR') !== !!prev?.roles.includes('HR')) {
+      throw new AppError('FORBIDDEN', 'Only the system administrator can give or remove the HR role.');
     }
 
     const e: Employee = {
@@ -65,7 +66,7 @@ export function saveEmployee(deps: Deps, c: Caller, input: SaveEmployeeInput): E
       position: input.position,
       salary: input.salary ?? '',
       employmentType: input.employmentType,
-      roles: [...new Set(input.roles)],
+      roles,
       signatureFileId: prev?.signatureFileId ?? '',
       isActive: input.isActive,
       createdAt: prev?.createdAt ?? now(deps),

@@ -439,6 +439,13 @@ describe('HR registration', () => {
     const staff = ok(endpoints.api_listEmployees(deps, {})).find((e) => e.email === PEOPLE.staff)!;
     const base = { employeeId: staff.employeeId, email: staff.email, lastName: staff.lastName, firstName: staff.firstName, divisionId: staff.divisionId, position: staff.position, employmentType: staff.employmentType, isActive: true };
     expect(err(endpoints.api_saveEmployee(deps, { ...base, roles: ['HR'] })).code).toBe('FORBIDDEN');
+    // Nobody can be made an administrator here, and an administrator keeps the role.
+    as(deps, PEOPLE.owner);
+    expect(ok(endpoints.api_saveEmployee(deps, { ...base, roles: ['ADMIN'] })).roles).toEqual([]);
+    const owner = ok(endpoints.api_listEmployees(deps, {})).find((e) => e.email === PEOPLE.owner)!;
+    const ownerBase = { employeeId: owner.employeeId, email: owner.email, lastName: owner.lastName, firstName: owner.firstName, divisionId: owner.divisionId, position: owner.position, employmentType: owner.employmentType, isActive: true };
+    expect(ok(endpoints.api_saveEmployee(deps, { ...ownerBase, roles: ['HR'] })).roles).toContain('ADMIN');
+    as(deps, PEOPLE.hr);
     expect(err(endpoints.api_saveEmployee(deps, { ...base, employeeId: undefined, roles: [] })).code).toBe('CONFLICT');
     // Deactivated staff can no longer sign in.
     ok(endpoints.api_saveEmployee(deps, { ...base, roles: [], isActive: false }));
