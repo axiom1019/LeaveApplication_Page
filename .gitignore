@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+.clasprc.json
+.env
+.env.*
+*.log
+.DS_Store
