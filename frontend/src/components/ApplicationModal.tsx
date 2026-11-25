@@ -24,6 +24,7 @@ function detailsText(a: ApplicationDetail): string {
   if (d.illness) parts.push(`Illness: ${d.illness}`);
   if (d.study) parts.push(STUDY_CHOICES[d.study]);
   if (d.otherPurpose) parts.push(OTHER_PURPOSE_CHOICES[d.otherPurpose]);
+  if (d.purpose) parts.push(`Purpose: ${d.purpose}`);
   return parts.join(' · ') || '—';
 }
 
@@ -316,7 +317,14 @@ function SignDialog(props: { app: ApplicationDetail; step: StepDto; mode: 'self'
         </Field>
       )}
 
-      {section === '7A' && (
+      {section === '7A' && (app.leaveType === 'CTO' || app.leaveType === 'WELLNESS') && (
+        <p className="small muted" style={{ marginBottom: 12 }}>
+          {app.leaveType === 'WELLNESS'
+            ? 'You certify the remaining wellness leave credits. The printed form fills them in from the Leave credits page.'
+            : 'Check the CTO left on the Leave credits page before certifying.'}
+        </p>
+      )}
+      {section === '7A' && app.leaveType !== 'CTO' && app.leaveType !== 'WELLNESS' && (
         <>
           <Field label="As of">
             <input type="date" value={credits.asOf ?? ''} onChange={(e) => setCredits((c) => ({ ...c, asOf: e.target.value }))} />
