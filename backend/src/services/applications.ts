@@ -313,7 +313,7 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
       dates,
       workingDays,
       commutation: form.commutation,
-      flow: ctx.settings.signatoryFlow,
+      flow: flowFor(ctx, me),
       currentStep: 0,
       status: 'PENDING',
       hrRemarks: '',
@@ -332,6 +332,15 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
     notifyApplicant(deps, app, me, waitingFor(ctx, app));
     return detail(ctx, c, app, new Map());
   });
+}
+
+/**
+ * The signing order for a new application. A Division Chief's own leave has no 7.B recommendation:
+ * there is no Assistant Regional Director, so it goes straight on to the Regional Director.
+ */
+export function flowFor(ctx: Ctx, applicant: Employee): FlowStep[] {
+  const isChief = [...ctx.divisions.values()].some((d) => d.isActive && d.chiefEmployeeId === applicant.employeeId);
+  return isChief ? ctx.settings.signatoryFlow.filter((s) => s.signatory !== 'DIVISION_CHIEF') : ctx.settings.signatoryFlow;
 }
 
 export function myApplications(deps: Deps, c: Caller): ApplicationSummary[] {

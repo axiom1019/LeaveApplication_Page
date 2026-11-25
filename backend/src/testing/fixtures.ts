@@ -24,7 +24,7 @@ function ok<T>(r: { ok: true; data: T } | { ok: false; error: { message: string 
 export function seededDeps(opts: { nowMs?: number } = {}): MemoryDeps & { ids: Record<keyof typeof PEOPLE, string>; divisionId: string } {
   const deps = createMemoryDeps({ ownerEmail: PEOPLE.owner, activeEmail: PEOPLE.owner, nowMs: opts.nowMs });
   initializeDatabase(deps);
-  const ord = ok(endpoints.api_listDivisions(deps, {}))[0]!;
+  const ord = ok(endpoints.api_listDivisions(deps, {})).find((d) => d.code === 'ORD')!;
   const tsd = ok(endpoints.api_saveDivision(deps, { code: 'TSD', name: 'Technical Services Division', isActive: true }));
   const add = (email: string, last: string, first: string, position: string, roles: string[], divisionId = tsd.divisionId, employmentType = 'REGULAR') =>
     ok(endpoints.api_saveEmployee(deps, { email, lastName: last, firstName: first, middleName: 'Santos', divisionId, position, salary: '45,000', employmentType, roles, isActive: true })).employeeId;

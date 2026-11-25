@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ApiResult } from '@shared/api';
 import { endpoints } from '../api/endpoints';
 import { PEOPLE, seededDeps } from '../testing/fixtures';
+import { initializeDatabase } from './setup';
 
 type Deps = ReturnType<typeof seededDeps>;
 
@@ -172,6 +173,18 @@ describe('signatories', () => {
     expect(html).toContain('RAMON S. MENDOZA');
   });
 
+  it("sends a Division Chief's own leave straight to the Supervising AO and the RD, with no 7.B", () => {
+    const deps = seededDeps();
+    const app = fileAs(deps, PEOPLE.chief);
+    expect(app.steps.map((s) => s.section)).toEqual(['7A', '7C']);
+    expect(app.waitingFor).toContain('Ana S. Garcia');
+    expect(signAs(deps, PEOPLE.ao, app.applicationId, 'CERTIFIED').ok).toBe(true);
+    const done = signAs(deps, PEOPLE.rd, app.applicationId, 'APPROVED');
+    expect(done.ok).toBe(true);
+    // Staff in the same division still go through their chief first.
+    expect(fileAs(deps, PEOPLE.staff).steps.map((s) => s.section)).toEqual(['7B', '7A', '7C']);
+  });
+
   it('ends as disapproved when the RD disapproves', () => {
     const deps = seededDeps();
     const { applicationId } = fileAs(deps, PEOPLE.staff);
@@ -199,8 +212,9 @@ describe('signatories', () => {
 
   it('never lets the applicant sign their own application', () => {
     const deps = seededDeps();
-    const { applicationId } = fileAs(deps, PEOPLE.chief);
-    as(deps, PEOPLE.chief);
+    // The Supervising AO is in the Office of the Regional Director, which has no Division Chief set.
+    const { applicationId } = fileAs(deps, PEOPLE.ao);
+    as(deps, PEOPLE.ao);
     const app = ok(endpoints.api_getApplication(deps, { applicationId }));
     expect(app.can.sign).toBe(false);
     expect(app.steps[0]!.assignee).toContain('No Division Chief');
@@ -208,6 +222,9 @@ describe('signatories', () => {
     as(deps, PEOPLE.hr);
     ok(endpoints.api_recordPaperSignature(deps, { applicationId, version: app.version, decision: 'FOR_APPROVAL', signerEmployeeId: deps.ids.rd }));
     expect(ok(endpoints.api_getApplication(deps, { applicationId })).steps[0]!.signature?.recordedByName).toContain('Hazel');
+    // 7.A is now the AO's own section, and they still cannot sign it.
+    as(deps, PEOPLE.ao);
+    expect(ok(endpoints.api_getApplication(deps, { applicationId })).can.sign).toBe(false);
   });
 
   it('lets a signer withdraw only until the next signatory acts', () => {
@@ -334,6 +351,17 @@ describe('privacy in emails', () => {
       expect(m.body).not.toContain(app.applicationId);
       expect(m.body).not.toContain('Torres');
     }
+  });
+});
+
+describe('setup', () => {
+  it('creates the regional office divisions once, and running it again adds nothing', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.owner);
+    const codes = () => ok(endpoints.api_listDivisions(deps, {})).map((d) => d.code).sort();
+    expect(codes()).toEqual(['AFD', 'ELUPDD', 'HOACDD', 'HREDRD', 'LEGAL', 'ORD', 'PHSD', 'TSD']);
+    initializeDatabase(deps);
+    expect(codes()).toHaveLength(8);
   });
 });
 
