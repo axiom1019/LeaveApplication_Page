@@ -256,6 +256,18 @@ export function filingBlock(ctx: Ctx, e: Employee): string {
 
 const CLOSED = new Set(['CANCELLED', 'DISAPPROVED']);
 
+/**
+ * The signing steps for a new application. A Division Chief's own leave, and leave from a division
+ * that has no chief (Legal, the Office of the RD), skip the Division Chief step: the Regional
+ * Director approves it directly (there is no Assistant Regional Director). The final approval step (7.C) is never skipped.
+ */
+export function flowFor(ctx: Ctx, applicant: Employee): FlowStep[] {
+  const division = ctx.divisions.get(applicant.divisionId);
+  const isChief = applicant.roles.includes('DIVISION_CHIEF') || [...ctx.divisions.values()].some((d) => d.isActive && d.chiefEmployeeId === applicant.employeeId);
+  const skipChief = isChief || !!division?.noChief;
+  return ctx.settings.signatoryFlow.filter((s) => !(skipChief && s.signatory === 'DIVISION_CHIEF' && s.section !== '7C'));
+}
+
 export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: LeaveForm): ApplicationDetail {
   return deps.lock.run(() => {
     const ctx = loadCtx(deps);
@@ -332,15 +344,6 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
     notifyApplicant(deps, app, me, waitingFor(ctx, app));
     return detail(ctx, c, app, new Map());
   });
-}
-
-/**
- * The signing order for a new application. A Division Chief's own leave has no 7.B recommendation:
- * there is no Assistant Regional Director, so it goes straight on to the Regional Director.
- */
-export function flowFor(ctx: Ctx, applicant: Employee): FlowStep[] {
-  const isChief = [...ctx.divisions.values()].some((d) => d.isActive && d.chiefEmployeeId === applicant.employeeId);
-  return isChief ? ctx.settings.signatoryFlow.filter((s) => s.signatory !== 'DIVISION_CHIEF') : ctx.settings.signatoryFlow;
 }
 
 export function myApplications(deps: Deps, c: Caller): ApplicationSummary[] {

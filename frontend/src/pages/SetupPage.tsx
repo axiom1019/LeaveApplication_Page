@@ -73,7 +73,7 @@ function Divisions() {
                 <tr key={d.divisionId} style={d.isActive ? undefined : { opacity: 0.55 }}>
                   <td>{d.code}</td>
                   <td>{d.name}</td>
-                  <td>{d.chiefName || <span className="muted">Not set</span>}</td>
+                  <td>{d.noChief ? <span className="muted">No chief: leave goes to the RD</span> : d.chiefName || <span className="muted">Not set</span>}</td>
                   <td>
                     <button className="btn" onClick={() => setEdit(d)}>
                       Edit
@@ -99,7 +99,7 @@ function Divisions() {
 }
 
 function DivisionForm(props: { d: DivisionDto | null; people: EmployeeDto[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ code: props.d?.code ?? '', name: props.d?.name ?? '', chiefEmployeeId: props.d?.chiefEmployeeId ?? '', isActive: props.d?.isActive ?? true });
+  const [f, setF] = useState({ code: props.d?.code ?? '', name: props.d?.name ?? '', chiefEmployeeId: props.d?.chiefEmployeeId ?? '', noChief: props.d?.noChief ?? false, isActive: props.d?.isActive ?? true });
   const [err, setErr] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   return (
@@ -136,8 +136,15 @@ function DivisionForm(props: { d: DivisionDto | null; people: EmployeeDto[]; onC
       <Field label="Name" error={errors.name}>
         <input type="text" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
       </Field>
-      <Field label="Division Chief" hint="Signs the Division Chief section for this division's staff.">
-        <select value={f.chiefEmployeeId} onChange={(e) => setF({ ...f, chiefEmployeeId: e.target.value })}>
+      <label className="choice" style={{ marginBottom: 16 }}>
+        <input type="checkbox" checked={f.noChief} onChange={(e) => setF({ ...f, noChief: e.target.checked })} />
+        <span>
+          This division has no Division Chief
+          <small>Leave from its staff skips the Division Chief step and goes to the Regional Director.</small>
+        </span>
+      </label>
+      <Field label="Division Chief" hint="Signs the Division Chief section for this division's staff. A chief's own leave goes to the Regional Director.">
+        <select disabled={f.noChief} value={f.chiefEmployeeId} onChange={(e) => setF({ ...f, chiefEmployeeId: e.target.value })}>
           <option value="">Not set</option>
           {props.people
             .filter((p) => p.isActive)

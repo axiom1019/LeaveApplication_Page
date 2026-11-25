@@ -114,6 +114,7 @@ export const saveDivisionInput = z.object({
   name: text(120).min(1, 'Required'),
   code: text(20).min(1, 'Required'),
   chiefEmployeeId: z.string().max(64).optional(),
+  noChief: z.boolean().optional(),
   isActive: z.boolean(),
 });
 

@@ -97,7 +97,7 @@ export function listDivisions(deps: Deps): DivisionDto[] {
   return [...loadDivisions(db).values()].map((d) => divisionDto(d, employees)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function saveDivision(deps: Deps, c: Caller, input: { divisionId?: string; name: string; code: string; chiefEmployeeId?: string; isActive: boolean }): DivisionDto {
+export function saveDivision(deps: Deps, c: Caller, input: { divisionId?: string; name: string; code: string; chiefEmployeeId?: string; noChief?: boolean; isActive: boolean }): DivisionDto {
   requireRole(c, 'HR', 'ADMIN');
   return deps.lock.run(() => {
     const db = deps.db.get();
@@ -110,7 +110,8 @@ export function saveDivision(deps: Deps, c: Caller, input: { divisionId?: string
       divisionId: prev?.divisionId ?? deps.uuid(),
       code: input.code,
       name: input.name,
-      chiefEmployeeId: input.chiefEmployeeId ?? '',
+      chiefEmployeeId: input.noChief ? '' : (input.chiefEmployeeId ?? ''),
+      noChief: !!input.noChief,
       isActive: input.isActive,
     };
     if (prev) db.replace('Divisions', d.divisionId, divisionRow(d));

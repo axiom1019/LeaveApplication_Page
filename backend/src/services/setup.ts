@@ -3,16 +3,19 @@ import type { Deps } from '../platform/types';
 import { audit } from './audit';
 import { divisionRow, employeeRow, readSettings, toEmployee, writeSettings } from './model';
 
-/** DHSUD Region 10: the Office of the Regional Director and its six divisions. */
-export const DIVISIONS: readonly [string, string][] = [
-  ['ORD', 'Office of the Regional Director'],
-  ['AFD', 'Administrative and Finance Division'],
-  ['HREDRD', 'Housing and Real Estate Development Regulation Division'],
-  ['HOACDD', 'Homeowners Associations and Community Development Division'],
-  ['ELUPDD', 'Environmental, Land Use and Urban Planning and Development Division'],
-  ['PHSD', 'Public Housing and Settlements Division'],
-  ['LEGAL', 'Legal Division'],
-];
+/**
+ * DHSUD Region 10 offices. Six divisions with five chiefs: Legal has no chief, and the Office of
+ * the Regional Director has none either, so leave from both goes past the Division Chief step.
+ */
+export const REGION_DIVISIONS = [
+  { code: 'ORD', name: 'Office of the Regional Director', noChief: true },
+  { code: 'AFD', name: 'Administrative and Finance Division', noChief: false },
+  { code: 'HREDRD', name: 'Housing and Real Estate Development Regulation Division', noChief: false },
+  { code: 'HOACDD', name: 'Homeowners Associations and Community Development Division', noChief: false },
+  { code: 'ELUPDD', name: 'Environmental, Land Use and Urban Planning and Development Division', noChief: false },
+  { code: 'PHSD', name: 'Public Housing and Settlements Division', noChief: false },
+  { code: 'LEGAL', name: 'Legal Division', noChief: true },
+] as const;
 
 /**
  * Creates the spreadsheet and its sheets (or adds what is missing), saves default settings and
@@ -24,12 +27,13 @@ export function initializeDatabase(deps: Deps): { url: string; created: boolean 
   deps.lock.run(() => {
     const db = deps.db.get();
     if (!db.readAll('Settings').length) writeSettings(deps, db, readSettings(db), 'setup');
-    // Adds the regional office's divisions that are missing (by code); names can be changed under Setup.
-    const codes = new Set(db.readAll('Divisions').map((r) => r.code.toUpperCase()));
-    for (const [code, name] of DIVISIONS) {
-      if (!codes.has(code)) db.append('Divisions', divisionRow({ divisionId: deps.uuid(), code, name, chiefEmployeeId: '', isActive: true }));
+    // Adds any of the Region 10 divisions that are missing, matched by code. HR picks the chiefs later.
+    const codes = new Set(db.readAll('Divisions').map((r) => r.code.trim().toUpperCase()));
+    for (const d of REGION_DIVISIONS) {
+      if (codes.has(d.code)) continue;
+      db.append('Divisions', divisionRow({ divisionId: deps.uuid(), code: d.code, name: d.name, chiefEmployeeId: '', noChief: d.noChief, isActive: true }));
     }
-    const divisionId = db.readAll('Divisions').find((r) => r.code.toUpperCase() === 'ORD')?.division_id ?? db.readAll('Divisions')[0]!.division_id;
+    const divisionId = db.readAll('Divisions').find((r) => r.code.trim().toUpperCase() === 'ORD')?.division_id ?? db.readAll('Divisions')[0]?.division_id ?? '';
     const owner = deps.identity.ownerEmail().toLowerCase();
     if (owner && !db.readAll('Employees').some((r) => toEmployee(r).email === owner)) {
       const now = new Date(deps.nowMs()).toISOString();

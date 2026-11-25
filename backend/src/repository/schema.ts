@@ -10,7 +10,7 @@ export const TABLES = {
       'employment_type', 'roles', 'signature_file_id', 'is_active', 'created_at', 'updated_at', 'version',
     ],
   },
-  Divisions: { id: 'division_id', columns: ['division_id', 'code', 'name', 'chief_employee_id', 'is_active'] },
+  Divisions: { id: 'division_id', columns: ['division_id', 'code', 'name', 'chief_employee_id', 'no_chief', 'is_active'] },
   Applications: {
     id: 'application_id',
     columns: [

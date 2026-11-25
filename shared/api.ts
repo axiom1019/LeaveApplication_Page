@@ -30,6 +30,7 @@ export interface DivisionDto {
   name: string;
   chiefEmployeeId: string;
   chiefName: string;
+  noChief: boolean;
   isActive: boolean;
 }
 

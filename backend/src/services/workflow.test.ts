@@ -210,21 +210,46 @@ describe('signatories', () => {
     expect(err(endpoints.api_sign(deps, { applicationId, version, method: 'PAPER', decision: 'CERTIFIED' })).code).toBe('STALE_VERSION');
   });
 
-  it('never lets the applicant sign their own application', () => {
+  it("sends a Division Chief's own leave past the chief step, straight on to the AO and the RD", () => {
     const deps = seededDeps();
-    // The Supervising AO is in the Office of the Regional Director, which has no Division Chief set.
-    const { applicationId } = fileAs(deps, PEOPLE.ao);
-    as(deps, PEOPLE.ao);
+    const { applicationId } = fileAs(deps, PEOPLE.chief);
+    as(deps, PEOPLE.chief);
     const app = ok(endpoints.api_getApplication(deps, { applicationId }));
     expect(app.can.sign).toBe(false);
-    expect(app.steps[0]!.assignee).toContain('No Division Chief');
-    // HR records the paper signature of whoever signed for the chief.
-    as(deps, PEOPLE.hr);
-    ok(endpoints.api_recordPaperSignature(deps, { applicationId, version: app.version, decision: 'FOR_APPROVAL', signerEmployeeId: deps.ids.rd }));
-    expect(ok(endpoints.api_getApplication(deps, { applicationId })).steps[0]!.signature?.recordedByName).toContain('Hazel');
-    // 7.A is now the AO's own section, and they still cannot sign it.
-    as(deps, PEOPLE.ao);
-    expect(ok(endpoints.api_getApplication(deps, { applicationId })).can.sign).toBe(false);
+    expect(app.steps.map((s) => s.signatory)).toEqual(['SUPERVISING_AO', 'REGIONAL_DIRECTOR']);
+    ok(signAs(deps, PEOPLE.ao, applicationId, 'CERTIFIED'));
+    ok(signAs(deps, PEOPLE.rd, applicationId, 'APPROVED'));
+    as(deps, PEOPLE.chief);
+    expect(ok(endpoints.api_getApplication(deps, { applicationId })).status).toBe('FOR_FILING');
+  });
+
+  it('skips the chief step for a division with no chief, such as Legal', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.owner);
+    const legal = ok(endpoints.api_listDivisions(deps, {})).find((d) => d.code === 'LEGAL')!;
+    expect(legal.noChief).toBe(true);
+    const staff = ok(endpoints.api_listEmployees(deps, {})).find((e) => e.email === PEOPLE.staff)!;
+    ok(endpoints.api_saveEmployee(deps, { ...staff, divisionId: legal.divisionId, middleName: staff.middleName || undefined, salary: staff.salary || undefined }));
+    const { applicationId } = fileAs(deps, PEOPLE.staff);
+    as(deps, PEOPLE.staff);
+    expect(ok(endpoints.api_getApplication(deps, { applicationId })).steps.map((s) => s.signatory)).toEqual(['SUPERVISING_AO', 'REGIONAL_DIRECTOR']);
+  });
+
+  it('creates the six Region 10 divisions and the Office of the RD on setup', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.owner);
+    const codes = ok(endpoints.api_listDivisions(deps, {})).map((d) => d.code);
+    for (const c of ['ORD', 'AFD', 'HREDRD', 'HOACDD', 'ELUPDD', 'PHSD', 'LEGAL']) expect(codes).toContain(c);
+  });
+
+  it('never lets the applicant sign their own application', () => {
+    const deps = seededDeps();
+    const { applicationId } = fileAs(deps, PEOPLE.rd);
+    ok(signAs(deps, PEOPLE.ao, applicationId, 'CERTIFIED'));
+    as(deps, PEOPLE.rd);
+    const app = ok(endpoints.api_getApplication(deps, { applicationId }));
+    expect(app.steps.at(-1)!.signatory).toBe('REGIONAL_DIRECTOR');
+    expect(app.can.sign).toBe(false);
   });
 
   it('lets a signer withdraw only until the next signatory acts', () => {

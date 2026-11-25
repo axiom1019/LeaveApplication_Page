@@ -75,6 +75,8 @@ export interface Division {
   code: string;
   name: string;
   chiefEmployeeId: string;
+  /** The division has no Division Chief, so its staff's leave skips that step and goes to the next signatory. */
+  noChief: boolean;
   isActive: boolean;
 }
 export const toDivision = (r: RowOf<'Divisions'>): Division => ({
@@ -82,6 +84,7 @@ export const toDivision = (r: RowOf<'Divisions'>): Division => ({
   code: r.code,
   name: r.name,
   chiefEmployeeId: r.chief_employee_id,
+  noChief: bool(r.no_chief),
   isActive: bool(r.is_active),
 });
 export const divisionRow = (d: Division): RowOf<'Divisions'> => ({
@@ -89,6 +92,7 @@ export const divisionRow = (d: Division): RowOf<'Divisions'> => ({
   code: d.code,
   name: d.name,
   chief_employee_id: d.chiefEmployeeId,
+  no_chief: boolCell(d.noChief),
   is_active: boolCell(d.isActive),
 });
 
