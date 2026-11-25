@@ -361,7 +361,7 @@ describe('privacy in emails', () => {
       endpoints.api_fileLeave(deps, {
         token,
         idempotencyKey: key(),
-        form: { leaveType: 'SL', details: { sick: 'HOSPITAL', illness: 'Dengue' }, dates: ['2026-12-07'], commutation: 'NOT_REQUESTED' },
+        form: { leaveType: 'WELLNESS', details: {}, dates: ['2026-12-07'], commutation: 'NOT_REQUESTED' },
       }),
     );
     ok(signAs(deps, PEOPLE.chief, app.applicationId, 'FOR_APPROVAL'));
@@ -369,7 +369,7 @@ describe('privacy in emails', () => {
     expect(mails.length).toBeGreaterThan(2);
     for (const m of mails) {
       const text = `${m.subject}\n${m.body}`;
-      expect(text).not.toMatch(/sick|dengue|hospital/i);
+      expect(text).not.toMatch(/sick|dengue|hospital|wellness/i);
     }
     const toCos = mails.filter((m) => m.to === PEOPLE.cos);
     expect(toCos.length).toBeGreaterThan(0);

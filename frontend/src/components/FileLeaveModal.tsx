@@ -2,12 +2,12 @@ import { useMemo, useRef, useState } from 'react';
 import type { ApplicationDetail } from '@shared/api';
 import { ROLE_LABELS } from '@shared/constants';
 import { countWorkingDays, formatInclusiveDates, formatLongDate } from '@shared/dates';
-import { LEAVE_TYPES, LOCATION_CHOICES, OTHER_PURPOSE_CHOICES, SICK_CHOICES, STUDY_CHOICES, leaveType, type LeaveTypeCode } from '@shared/leaveTypes';
+import { leaveTypesFor, LOCATION_CHOICES, OTHER_PURPOSE_CHOICES, SICK_CHOICES, STUDY_CHOICES, leaveType, type LeaveTypeCode } from '@shared/leaveTypes';
 import { leaveForm, type LeaveDetails } from '@shared/schemas';
 import { api, errorText, fieldErrors, newKey } from '../api/client';
 import { useSession } from '../session';
 import { DatePicker } from './Calendar';
-import { Field, Modal } from './ui';
+import { Field, Modal, useLoad } from './ui';
 
 /** CSC Form No. 6 in one modal. Items 1–5 come from the person's record; 6.A–6.D are filled in here. */
 export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: ApplicationDetail) => void }) {
@@ -23,6 +23,10 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
   const key = useRef(newKey());
+  const credits = useLoad(() => api('api_myCredits'));
+  const types = leaveTypesFor(e.employmentType);
+  // Forced leave is charged to VL, so show both.
+  const creditLines = (credits.data?.lines ?? []).filter((l) => l.code === type || (type === 'FL' && l.code === 'VL'));
 
   const holidays = useMemo(() => new Map(boot.holidays.map((h) => [h.date, h.name])), [boot.holidays]);
   const working = countWorkingDays(dates, new Set(holidays.keys()));
@@ -102,7 +106,7 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
 
       <div className="section-title">6.A Type of leave</div>
       <div className="type-grid" role="radiogroup" aria-label="Type of leave">
-        {LEAVE_TYPES.map((t) => (
+        {types.map((t) => (
           <label key={t.code} className="choice">
             <input
               type="radio"
@@ -121,6 +125,12 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
         ))}
       </div>
       {errors.leaveType && <div className="err small" style={{ color: 'var(--red)' }}>{errors.leaveType}</div>}
+      {creditLines.map((l) => (
+        <div key={l.code} className={`notice ${l.available > 0 ? 'info' : ''}`} style={{ marginTop: 10, marginBottom: 0 }}>
+          <b>{l.label}:</b> {l.available} day{l.available === 1 ? '' : 's'} available
+          {l.onHold ? `, after ${l.onHold} on hold in other applications` : ''}. <span className="muted">{l.note}</span>
+        </div>
+      ))}
       {type === 'OTHERS' && (
         <div style={{ marginTop: 10 }}>
           <Field label="Others (specify)" error={errors.leaveTypeOther}>

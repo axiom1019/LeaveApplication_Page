@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BootstrapDto, SessionState } from '@shared/api';
 import { api, errorText, setToken, setUnauthenticatedHandler } from './api/client';
 import { Menu, X } from 'lucide-react';
+import barChart from 'react-useanimations/lib/barChart';
 import calendar from 'react-useanimations/lib/calendar';
 import edit from 'react-useanimations/lib/edit';
 import inbox from 'react-useanimations/lib/inbox';
@@ -15,6 +16,7 @@ import seal from './assets/seal.png';
 import { AnimatedIcon, type AnimatedIconData } from './components/AnimatedIcon';
 import { Centered, Loading } from './components/ui';
 import { LoginPage } from './pages/LoginPage';
+import { CreditsPage } from './pages/CreditsPage';
 import { AllApplicationsPage, InboxPage, MyLeavePage } from './pages/lists';
 import { PeoplePage } from './pages/PeoplePage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -22,7 +24,7 @@ import { SetupPage } from './pages/SetupPage';
 import { SignaturePage } from './pages/SignaturePage';
 import { Session, type SessionCtx } from './session';
 
-type Page = 'mine' | 'inbox' | 'all' | 'people' | 'setup' | 'signature' | 'profile';
+type Page = 'mine' | 'inbox' | 'all' | 'credits' | 'people' | 'setup' | 'signature' | 'profile';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -83,8 +85,9 @@ export function App() {
     ['mine', 'My leave', true],
     ['inbox', 'For my action', me.isSignatory || me.inboxCount > 0, me.inboxCount],
     ['all', 'All applications', hr],
+    ['credits', 'Leave credits', hr || has('SUPERVISING_AO')],
     ['people', 'People', hr],
-    ['setup', 'Setup', hr || has('REGIONAL_DIRECTOR') || (has('SUPERVISING_AO') && ctx.boot.settings.leaveCreditsMode === 'TRACKED')],
+    ['setup', 'Setup', hr || has('REGIONAL_DIRECTOR')],
     ['signature', 'My signature', me.isSignatory],
     ['profile', 'My profile', true],
   ];
@@ -183,6 +186,7 @@ export function App() {
                 {current === 'mine' && <MyLeavePage />}
                 {current === 'inbox' && <InboxPage />}
                 {current === 'all' && <AllApplicationsPage />}
+                {current === 'credits' && <CreditsPage />}
                 {current === 'people' && <PeoplePage />}
                 {current === 'setup' && <SetupPage />}
                 {current === 'signature' && <SignaturePage />}
@@ -200,6 +204,7 @@ const NAV_ICONS: Record<Page, AnimatedIconData> = {
   mine: calendar,
   inbox: inbox,
   all: list,
+  credits: barChart,
   people: users,
   setup: settings,
   signature: edit,

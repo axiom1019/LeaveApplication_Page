@@ -33,6 +33,10 @@ export const TABLES = {
   },
   Holidays: { id: 'date', columns: ['date', 'name'] },
   LeaveCredits: { id: 'employee_id', columns: ['employee_id', 'as_of', 'vl_balance', 'sl_balance', 'updated_by', 'updated_at'] },
+  CocEntries: {
+    id: 'entry_id',
+    columns: ['entry_id', 'employee_id', 'earned_on', 'hours', 'reference', 'created_by', 'created_at', 'deleted_at'],
+  },
   Settings: { id: 'key', columns: ['key', 'value', 'updated_by', 'updated_at'] },
   AuditLog: { id: 'log_id', columns: ['log_id', 'at', 'actor_id', 'actor_email', 'action', 'entity_id', 'detail_json'] },
 } as const;

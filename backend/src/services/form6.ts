@@ -7,7 +7,7 @@
 import type { SettingsDto } from '@shared/api';
 import type { Section } from '@shared/constants';
 import { formatInclusiveDates, formatLongDate, manilaDateTime } from '@shared/dates';
-import { LEAVE_TYPES, LOCATION_CHOICES, OTHER_PURPOSE_CHOICES, SICK_CHOICES, STUDY_CHOICES } from '@shared/leaveTypes';
+import { LEAVE_TYPES, othersText, LOCATION_CHOICES, OTHER_PURPOSE_CHOICES, SICK_CHOICES, STUDY_CHOICES } from '@shared/leaveTypes';
 import type { Application, Signature } from './model';
 
 export interface SectionView {
@@ -84,10 +84,11 @@ const CSS = `
 export function renderForm6(view: Form6View): string {
   const { app, settings, sections } = view;
   const d = app.details;
-  const typeRows = LEAVE_TYPES.filter((t) => t.code !== 'OTHERS')
+  const typeRows = LEAVE_TYPES.filter((t) => t.for === 'REGULAR' && t.code !== 'OTHERS')
     .map((t) => `<div class="opt">${box(app.leaveType === t.code)}${esc(t.label)} <span class="tiny">(${esc(t.basis)})</span></div>`)
     .join('');
-  const others = app.leaveType === 'OTHERS';
+  const othersLabel = othersText(app.leaveType, app.leaveTypeOther);
+  const others = othersLabel !== null;
   const a7 = sections['7A'];
   const b7 = sections['7B'];
   const c7 = sections['7C'];
@@ -124,7 +125,7 @@ export function renderForm6(view: Form6View): string {
       <tr>
         <td style="width:55%"><div class="lbl">6.A TYPE OF LEAVE TO BE AVAILED OF</div>
           ${typeRows}
-          <div class="opt" style="margin-top:6px"><i>Others:</i> ${box(others)}${line(others ? app.leaveTypeOther : '', '75%')}</div>
+          <div class="opt" style="margin-top:6px"><i>Others:</i> ${box(others)}${line(othersLabel ?? '', '75%')}</div>
         </td>
         <td><div class="lbl">6.B DETAILS OF LEAVE</div>
           <div class="small"><i>In case of Vacation/Special Privilege Leave:</i></div>

@@ -7,7 +7,7 @@ import { api, errorText, fieldErrors } from '../api/client';
 import { Field, Loading, Modal, useLoad, useToast } from '../components/ui';
 import { useSession } from '../session';
 
-type Tab = 'divisions' | 'holidays' | 'oic' | 'credits' | 'settings' | 'audit';
+type Tab = 'divisions' | 'holidays' | 'oic' | 'settings' | 'audit';
 
 export function SetupPage() {
   const { has, boot } = useSession();
@@ -16,7 +16,6 @@ export function SetupPage() {
     ['divisions', 'Divisions', hr],
     ['holidays', 'Holidays', hr],
     ['oic', 'OIC Regional Director', hr || has('REGIONAL_DIRECTOR')],
-    ['credits', 'Leave credits', boot.settings.leaveCreditsMode === 'TRACKED' && (hr || has('SUPERVISING_AO'))],
     ['settings', 'Settings', hr],
     ['audit', 'Audit log', hr],
   ];
@@ -40,7 +39,6 @@ export function SetupPage() {
       {tab === 'divisions' && <Divisions />}
       {tab === 'holidays' && <Holidays />}
       {tab === 'oic' && <OicTab />}
-      {tab === 'credits' && <Credits />}
       {tab === 'settings' && <SettingsTab />}
       {tab === 'audit' && <Audit />}
     </>
@@ -303,75 +301,6 @@ function OicTab() {
   );
 }
 
-function Credits() {
-  const list = useLoad(() => api('api_listCredits'));
-  const people = useEmployees();
-  const [f, setF] = useState({ employeeId: '', asOf: '', vl: '', sl: '' });
-  const [err, setErr] = useState('');
-  return (
-    <div className="card card-pad">
-      <p className="muted small" style={{ marginBottom: 12 }}>
-        Balances here fill in section 7.A for the Supervising Administrative Officer to check. They are not deducted automatically; update them from the leave card.
-      </p>
-      {err && <div className="form-err">{err}</div>}
-      <form
-        className="filters"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          try {
-            list.setData(await api('api_saveCredits', { employeeId: f.employeeId, asOf: f.asOf, vlBalance: Number(f.vl), slBalance: Number(f.sl) }));
-            setF({ employeeId: '', asOf: '', vl: '', sl: '' });
-            setErr('');
-          } catch (x) {
-            setErr(errorText(x));
-          }
-        }}
-      >
-        <select value={f.employeeId} onChange={(e) => setF({ ...f, employeeId: e.target.value })} required aria-label="Employee">
-          <option value="">Employee…</option>
-          {(people.data ?? [])
-            .filter((p) => p.isActive)
-            .map((p) => (
-              <option key={p.employeeId} value={p.employeeId}>
-                {p.fullName}
-              </option>
-            ))}
-        </select>
-        <input type="date" value={f.asOf} onChange={(e) => setF({ ...f, asOf: e.target.value })} required aria-label="As of" />
-        <input type="number" step="0.001" min="0" value={f.vl} onChange={(e) => setF({ ...f, vl: e.target.value })} placeholder="VL balance" required aria-label="Vacation leave balance" />
-        <input type="number" step="0.001" min="0" value={f.sl} onChange={(e) => setF({ ...f, sl: e.target.value })} placeholder="SL balance" required aria-label="Sick leave balance" />
-        <button className="btn primary" type="submit">
-          Save
-        </button>
-      </form>
-      {list.data ? (
-        <table className="grid">
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>As of</th>
-              <th>Vacation leave</th>
-              <th>Sick leave</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.data.map((c) => (
-              <tr key={c.employeeId}>
-                <td>{c.employeeName}</td>
-                <td>{formatLongDate(c.asOf)}</td>
-                <td>{c.vlBalance}</td>
-                <td>{c.slBalance}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <Loading error={list.error} />
-      )}
-    </div>
-  );
-}
-
 function SettingsTab() {
   const { has, refreshMe } = useSession();
   const toast = useToast();
@@ -437,15 +366,15 @@ function SettingsTab() {
           <label className="choice">
             <input type="radio" checked={f.leaveCreditsMode === 'LEAVE_CARD'} onChange={() => setF({ ...f, leaveCreditsMode: 'LEAVE_CARD' })} />
             <span>
-              Kept on the HR leave card
-              <small>The Supervising AO writes the credits on paper, or types them when e-signing.</small>
+              The Supervising AO fills in 7.A
+              <small>They write the credits on paper from the leave card, or type them when e-signing.</small>
             </span>
           </label>
           <label className="choice">
             <input type="radio" checked={f.leaveCreditsMode === 'TRACKED'} onChange={() => setF({ ...f, leaveCreditsMode: 'TRACKED' })} />
             <span>
-              Balances kept in this app
-              <small>HR enters balances under Setup → Leave credits; they fill in 7.A for the Supervising AO to check.</small>
+              Fill in 7.A from the Leave Credits page
+              <small>The app fills in 7.A from each regular employee's credits for the Supervising AO to check.</small>
             </span>
           </label>
         </div>

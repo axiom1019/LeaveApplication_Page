@@ -157,12 +157,42 @@ export interface OicDto {
   createdBy: string;
 }
 
+export type CreditCode = 'VL' | 'SL' | 'FL' | 'SPL' | 'CTO' | 'WELLNESS';
+
+/** One row of a leave credits table. Figures are working days. */
+export interface CreditLine {
+  code: CreditCode;
+  label: string;
+  /** Balance on record plus monthly earnings (VL, SL), the yearly allowance (FL, SPL, Wellness), or unexpired COC (CTO). */
+  earned: number;
+  /** Approved leave already taken from it. */
+  used: number;
+  /** Leave filed and not yet decided or filed by HR. */
+  onHold: number;
+  available: number;
+  note: string;
+}
+
 export interface CreditsDto {
   employeeId: string;
   employeeName: string;
+  divisionName: string;
+  employmentType: EmploymentType;
+  /** Date of the VL/SL balance HR entered from the leave card; '' if none yet. */
   asOf: string;
   vlBalance: number;
   slBalance: number;
+  lines: CreditLine[];
+}
+
+export interface CocDto {
+  entryId: string;
+  employeeId: string;
+  earnedOn: string;
+  hours: number;
+  reference: string;
+  expiresOn: string;
+  remainingHours: number;
 }
 
 export interface AuditDto {
@@ -207,8 +237,12 @@ export interface ApiContract {
   api_deleteOic: [In<typeof S.deleteOicInput>, OicDto[]];
   api_getSettings: [Empty, SettingsDto];
   api_saveSettings: [In<typeof S.settingsInput>, SettingsDto];
+  api_myCredits: [Empty, CreditsDto];
   api_listCredits: [Empty, CreditsDto[]];
   api_saveCredits: [In<typeof S.saveCreditsInput>, CreditsDto[]];
+  api_listCoc: [In<typeof S.employeeRef>, CocDto[]];
+  api_saveCoc: [In<typeof S.saveCocInput>, CocDto[]];
+  api_deleteCoc: [In<typeof S.deleteCocInput>, CocDto[]];
   api_uploadSignature: [In<typeof S.uploadSignatureInput>, { ok: true }];
   api_mySignature: [Empty, { pngBase64: string | null }];
   api_saveMyProfile: [In<typeof S.saveMyProfileInput>, EmployeeDto];

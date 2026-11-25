@@ -1,4 +1,4 @@
-import type { CreditsDto, DivisionDto, EmployeeDto, OicDto, SettingsDto } from '@shared/api';
+import type { DivisionDto, EmployeeDto, OicDto, SettingsDto } from '@shared/api';
 import type { Role } from '@shared/constants';
 import type { SaveEmployeeInput, SaveMyProfileInput, SettingsInput } from '@shared/schemas';
 import type { Deps } from '../platform/types';
@@ -253,31 +253,6 @@ export function saveSettings(deps: Deps, c: Caller, input: SettingsInput): Setti
     audit(deps, c.employee.employeeId, c.email, 'SAVE_SETTINGS', 'settings', { before, after: input });
     return readSettings(db);
   });
-}
-
-// ---------------------------------------------------------------- leave credits (when tracked in the app)
-
-export function listCredits(deps: Deps, c: Caller): CreditsDto[] {
-  requireRole(c, 'HR', 'ADMIN', 'SUPERVISING_AO');
-  const db = deps.db.get();
-  const employees = loadEmployees(db);
-  return db.readAll('LeaveCredits').map((r) => {
-    const e = employees.get(r.employee_id);
-    return { employeeId: r.employee_id, employeeName: e ? fullName(e) : '(unknown)', asOf: r.as_of, vlBalance: Number(r.vl_balance) || 0, slBalance: Number(r.sl_balance) || 0 };
-  });
-}
-
-export function saveCredits(deps: Deps, c: Caller, input: { employeeId: string; asOf: string; vlBalance: number; slBalance: number }): CreditsDto[] {
-  requireRole(c, 'HR', 'ADMIN', 'SUPERVISING_AO');
-  deps.lock.run(() => {
-    const db = deps.db.get();
-    if (!db.findOne('Employees', 'employee_id', input.employeeId)) throw new AppError('NOT_FOUND', 'Employee not found.');
-    const row = { employee_id: input.employeeId, as_of: input.asOf, vl_balance: String(input.vlBalance), sl_balance: String(input.slBalance), updated_by: c.employee.employeeId, updated_at: now(deps) };
-    if (db.findOne('LeaveCredits', 'employee_id', input.employeeId)) db.replace('LeaveCredits', input.employeeId, row);
-    else db.append('LeaveCredits', row);
-    audit(deps, c.employee.employeeId, c.email, 'SAVE_CREDITS', input.employeeId, input);
-  });
-  return listCredits(deps, c);
 }
 
 // ---------------------------------------------------------------- specimen signature

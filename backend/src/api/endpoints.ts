@@ -11,6 +11,7 @@ import type { Deps } from '../platform/types';
 import * as admin from '../services/admin';
 import * as apps from '../services/applications';
 import { listAudit } from '../services/audit';
+import * as credits from '../services/credits';
 import { currentCaller, requestCode, requireCaller, requireRole, signOut, verifyCode, type Caller } from '../services/auth';
 import { AppError, isAppError } from '../services/errors';
 import { activeSignatures, employeeDto } from '../services/model';
@@ -154,8 +155,12 @@ export const endpoints: Endpoints = {
   api_deleteOic: authed('api_deleteOic', (deps, c, input) => admin.deleteOic(deps, c, parse(S.deleteOicInput, input).assignmentId)),
   api_getSettings: authed('api_getSettings', (deps, c) => admin.getSettings(deps, c)),
   api_saveSettings: authed('api_saveSettings', (deps, c, input) => admin.saveSettings(deps, c, parse(S.settingsInput, input))),
-  api_listCredits: authed('api_listCredits', (deps, c) => admin.listCredits(deps, c)),
-  api_saveCredits: authed('api_saveCredits', (deps, c, input) => admin.saveCredits(deps, c, parse(S.saveCreditsInput, input))),
+  api_myCredits: authed('api_myCredits', (deps, c) => credits.myCredits(deps, c)),
+  api_listCredits: authed('api_listCredits', (deps, c) => credits.listCredits(deps, c)),
+  api_saveCredits: authed('api_saveCredits', (deps, c, input) => credits.saveCredits(deps, c, parse(S.saveCreditsInput, input))),
+  api_listCoc: authed('api_listCoc', (deps, c, input) => credits.listCoc(deps, c, parse(S.employeeRef, input).employeeId)),
+  api_saveCoc: authed('api_saveCoc', (deps, c, input) => credits.saveCoc(deps, c, parse(S.saveCocInput, input))),
+  api_deleteCoc: authed('api_deleteCoc', (deps, c, input) => credits.deleteCoc(deps, c, parse(S.deleteCocInput, input).entryId)),
   api_uploadSignature: authed('api_uploadSignature', (deps, c, input) => admin.uploadSignature(deps, c, parse(S.uploadSignatureInput, input).pngBase64)),
   api_mySignature: authed('api_mySignature', (deps, c) => admin.mySignature(deps, c)),
   api_saveMyProfile: authed('api_saveMyProfile', (deps, c, input) => admin.saveMyProfile(deps, c, parse(S.saveMyProfileInput, input))),

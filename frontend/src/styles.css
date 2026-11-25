@@ -265,3 +265,19 @@ dl.kv dd { margin: 0; }
   .row-btn { grid-template-columns: 1fr; }
   .row-btn .side { text-align: left; }
 }
+
+/* ---------- leave credits ---------- */
+table.grid th.num, table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.grid .cell-sub { color: var(--ink-3); font-size: 0.75rem; margin-top: 2px; }
+.neg { color: var(--danger); }
+.badge-warn { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; background: #fffaeb; color: var(--warn); border: 1px solid #fedf89; }
+.cols-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 16px; }
+@media (max-width: 600px) {
+  .cols-3 { grid-template-columns: 1fr; }
+  table.credits thead { display: none; }
+  table.credits tr { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); padding: 8px 0; }
+  table.credits td { border: 0; padding: 4px 12px; }
+  table.credits td:first-child { grid-column: 1 / -1; }
+  table.credits td.num { text-align: left; }
+  table.credits td.num::before { content: attr(data-label); display: block; font-size: 0.6875rem; color: var(--ink-3); text-transform: uppercase; }
+}

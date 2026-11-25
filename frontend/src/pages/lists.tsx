@@ -5,6 +5,7 @@ import { APPLICATION_STATUSES, STATUS_LABELS } from '@shared/constants';
 import { formatLongDate } from '@shared/dates';
 import { api } from '../api/client';
 import { ApplicationModal } from '../components/ApplicationModal';
+import { CreditsTable, creditsCaption } from '../components/CreditsTable';
 import { FileLeaveModal } from '../components/FileLeaveModal';
 import { Loading, StatusPill, useLoad } from '../components/ui';
 import { useSession } from '../session';
@@ -56,6 +57,8 @@ export function MyLeavePage() {
         </button>
       </div>
       {!me.canFile && <div className="notice">{me.cannotFileReason}</div>}
+      <MyCredits reloadKey={list.data} />
+      <div className="section-title" style={{ marginTop: 24 }}>My applications</div>
       <div className="card">{list.data ? <AppList items={list.data} empty="You have not filed leave here yet." onOpen={(id) => setOpen({ id })} /> : <Loading error={list.error} />}</div>
       {filing && (
         <FileLeaveModal
@@ -68,6 +71,28 @@ export function MyLeavePage() {
         />
       )}
       {open && <ApplicationModal applicationId={open.id} justFiled={open.justFiled} onClose={() => setOpen(null)} onChanged={list.reload} />}
+    </>
+  );
+}
+
+/** "My leave credits": what the signed-in person has left. Reloads when their applications change. */
+function MyCredits(props: { reloadKey: unknown }) {
+  const credits = useLoad(() => api('api_myCredits'), [props.reloadKey]);
+  return (
+    <>
+      <div className="section-title">My leave credits</div>
+      {credits.data ? (
+        <>
+          <div className="card">
+            <CreditsTable credits={credits.data} />
+          </div>
+          <p className="small muted" style={{ marginTop: 8 }}>
+            {creditsCaption(credits.data)} Leave on hold is filed but not yet approved.
+          </p>
+        </>
+      ) : (
+        <Loading error={credits.error} />
+      )}
     </>
   );
 }

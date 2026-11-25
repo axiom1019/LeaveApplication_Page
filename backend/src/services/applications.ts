@@ -1,7 +1,8 @@
 import type { ApplicationDetail, ApplicationSummary, SettingsDto, SignatureDto, StepDto } from '@shared/api';
 import { ROLE_LABELS, SECTION_LABELS, STATUS_LABELS, type Section } from '@shared/constants';
 import { countWorkingDays, formatInclusiveDates, manilaDate, manilaDateTime, normalizeDates } from '@shared/dates';
-import { leaveType } from '@shared/leaveTypes';
+import { leaveType, leaveTypesFor } from '@shared/leaveTypes';
+import { creditsFor } from './credits';
 import type { LeaveForm, SignInput } from '@shared/schemas';
 import { int } from '../repository/cells';
 import type { Db, Deps } from '../platform/types';
@@ -191,17 +192,24 @@ export function steps(ctx: Ctx, app: Application, sigs: Map<number, Signature>):
 
 function creditsPrefill(ctx: Ctx, app: Application): ApplicationDetail['creditsPrefill'] {
   if (ctx.settings.leaveCreditsMode !== 'TRACKED') return null;
-  const row = ctx.db.findOne('LeaveCredits', 'employee_id', app.applicantId);
-  if (!row) return null;
-  const vl = Number(row.vl_balance) || 0;
-  const sl = Number(row.sl_balance) || 0;
+  const applicant = ctx.employees.get(app.applicantId);
+  if (!applicant || applicant.employmentType === 'COS') return null;
+  const cr = creditsFor(ctx.db, applicant, ctx.divisions, ctx.today);
+  if (!cr.asOf) return null;
+  // Balances before this application: earned less approved leave already taken.
+  const before = (code: string) => {
+    const l = cr.lines.find((x) => x.code === code);
+    return l ? l.earned - l.used : 0;
+  };
+  const vl = before('VL');
+  const sl = before('SL');
   const days = app.workingDays;
   // Forced leave is charged to vacation leave; special privilege leave has its own 3-day credit.
   const lessVl = app.leaveType === 'VL' || app.leaveType === 'FL' ? days : 0;
   const lessSl = app.leaveType === 'SL' ? days : 0;
   const f = (n: number) => (Math.round(n * 1000) / 1000).toString();
   return {
-    asOf: row.as_of,
+    asOf: ctx.today,
     vlEarned: f(vl),
     vlLess: f(lessVl),
     vlBalance: f(vl - lessVl),
@@ -256,6 +264,24 @@ export function filingBlock(ctx: Ctx, e: Employee): string {
 
 const CLOSED = new Set(['CANCELLED', 'DISAPPROVED']);
 
+/** Refuses leave types the person is not entitled to, and CTO, wellness or SPL beyond what is left. */
+function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], workingDays: number, all: Application[]) {
+  if (!leaveTypesFor(me.employmentType).some((t) => t.code === code)) {
+    const msg = me.employmentType === 'COS' ? 'Contract of service staff can file CTO or Wellness Leave only.' : 'CTO and Wellness Leave are for contract of service staff.';
+    throw new AppError('VALIDATION', msg, { fields: { leaveType: msg } });
+  }
+  if (code !== 'CTO' && code !== 'WELLNESS' && code !== 'SPL') return;
+  const leaveYear = (dates[0] ?? ctx.today).slice(0, 4);
+  // Yearly allowances are counted for the year of the leave; CTO against COC unexpired today.
+  const asOf = code === 'CTO' || leaveYear === ctx.today.slice(0, 4) ? ctx.today : `${leaveYear}-01-01`;
+  const line = creditsFor(ctx.db, me, ctx.divisions, asOf, all).lines.find((l) => l.code === code);
+  if (line && workingDays > line.available) {
+    const left = Math.max(0, line.available);
+    const msg = `You have ${left} day${left === 1 ? '' : 's'} of ${line.label} left${line.onHold ? `, after ${line.onHold} on hold in other applications` : ''}. This application needs ${workingDays}.`;
+    throw new AppError('VALIDATION', msg, { fields: { dates: msg } });
+  }
+}
+
 /**
  * The signing steps for a new application. A Division Chief's own leave, and leave from a division
  * that has no chief (Legal, the Office of the RD), skip the Division Chief step: the Regional
@@ -289,6 +315,7 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
     if (clash) {
       throw new AppError('CONFLICT', `You already have leave application ${clash.applicationId} covering some of these dates.`, { fields: { dates: 'Overlaps another application' } });
     }
+    checkCredits(ctx, me, form.leaveType, dates, workingDays, existing);
 
     const year = ctx.today.slice(0, 4);
     const prefix = `LA-${year}-`;

@@ -16,6 +16,10 @@ deps.setActiveEmail(PEOPLE.owner);
 endpoints.api_saveHoliday(deps, { date: '2026-12-08', name: 'Feast of the Immaculate Conception' });
 endpoints.api_saveHoliday(deps, { date: '2026-12-25', name: 'Christmas Day' });
 endpoints.api_saveHoliday(deps, { date: '2026-12-30', name: 'Rizal Day' });
+// Sample leave credits: a leave card balance for the regular staff member, COCs for the COS worker.
+endpoints.api_saveCredits(deps, { employeeId: deps.ids.staff, asOf: '2026-10-31', vlBalance: 12.5, slBalance: 9.75 });
+endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-10-17', hours: 8, reference: 'OT authority 2026-10-02' });
+endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-14', hours: 12, reference: 'OT authority 2026-11-05' });
 deps.setActiveEmail(PEOPLE.staff);
 endpoints.api_fileLeave(deps, {
   idempotencyKey: '00000000-0000-4000-8000-0000000000aa',

@@ -163,6 +163,15 @@ export const saveCreditsInput = z.object({
   slBalance: z.number().min(0).max(10_000),
 });
 
+export const employeeRef = z.object({ employeeId: id });
+export const saveCocInput = z.object({
+  employeeId: id,
+  earnedOn: isoDate,
+  hours: z.number().positive('Enter the hours earned').max(400),
+  reference: text(200).min(1, 'Enter the reference, such as the overtime authority or COC certificate'),
+});
+export const deleteCocInput = z.object({ entryId: id });
+
 export const uploadSignatureInput = z.object({
   /** PNG data, base64 without the data: prefix. About 300 KB at most after the browser resizes it. */
   pngBase64: z.string().min(100).max(400_000).regex(/^[A-Za-z0-9+/=]+$/),
