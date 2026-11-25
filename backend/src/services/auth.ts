@@ -1,9 +1,9 @@
 /*
  * Who is calling.
  *
- * The web app runs as the owner account and accepts any Google account. Google tells the app
- * the email of a dhsud.gov.ph user (same Workspace domain as the owner), but withholds it for
- * personal accounts. So:
+ * The web app runs as the owner account and is open to anyone, without a Google sign-in (access
+ * ANYONE_ANONYMOUS): requiring one locked out personal accounts and people signed in to several
+ * Google accounts. When Google does share a dhsud.gov.ph user's email, it is used; otherwise:
  *   - govmail users are recognised automatically from their Google sign-in;
  *   - everyone else (staff without govmail, COS staff) proves they own their registered address
  *     with a 6-digit code sent to it, and gets a session token for SESSION_HOURS.

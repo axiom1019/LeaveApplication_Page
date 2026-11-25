@@ -65,7 +65,7 @@ export function LoginPage(props: { googleEmail: string; denied: boolean; onSigne
         >
           <Field
             label="Your registered email"
-            hint="Staff with govmail: open this page while signed in to your dhsud.gov.ph Google account and you go straight in."
+            hint="Use your dhsud.gov.ph address or the personal email HR registered. We email you a 6-digit code."
           >
             <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </Field>
