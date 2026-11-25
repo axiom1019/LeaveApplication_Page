@@ -84,7 +84,7 @@ First time, for each environment (staging first):
 3. Open the Apps Script project, choose `setupDatabase` and click Run. Approve the permissions. It creates the spreadsheet, two private Drive folders, and registers the owner as administrator and HR.
 4. Open the web app URL as the owner, then register HR staff, divisions and their chiefs, signatories, holidays and the pilot division's staff.
 
-The deployment runs as the owner (`executeAs: USER_DEPLOYING`) and is open to anyone with a Google account (`access: ANYONE`); the app itself admits only registered addresses.
+The deployment runs as the owner (`executeAs: USER_DEPLOYING`) and is open without a Google sign-in (`access: ANYONE_ANONYMOUS`), so COS staff whose personal email is not a Google account can reach it, and nobody hits Google's account picker. The app itself admits only registered addresses: govmail users Google recognises sign in directly, everyone else with an emailed code.
 
 Production: `CONFIRM_PRODUCTION=yes npm run deploy:production`. It is refused until the DPO approves the privacy notice and `approved` is set to `true` in `shared/privacy.ts`.
 
