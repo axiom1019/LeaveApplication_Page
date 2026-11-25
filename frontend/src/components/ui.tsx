@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ApplicationStatus } from '@shared/constants';
-import { STATUS_LABELS } from '@shared/constants';
+import { APP_NAME, STATUS_LABELS } from '@shared/constants';
+import seal from '../assets/seal.png';
 
 export function Modal(props: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; narrow?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -92,4 +93,17 @@ export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []) {
 
 export function Loading({ error }: { error?: string | null }) {
   return <div className="spinner">{error ? <span className="form-err">{error}</span> : 'Loading…'}</div>;
+}
+
+/** A single card in the middle of the page under the seal and the app name (sign-in, setup), as in the scheduler. */
+export function Centered({ children }: { children: ReactNode }) {
+  return (
+    <div className="centered">
+      <div className="centered-brand">
+        <img src={seal} alt="" />
+        <span>{APP_NAME}</span>
+      </div>
+      <div className="card centered-card">{children}</div>
+    </div>
+  );
 }

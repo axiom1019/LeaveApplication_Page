@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import type { ApplicationDetail, ApplicationSummary } from '@shared/api';
 import { APPLICATION_STATUSES, STATUS_LABELS } from '@shared/constants';
 import { formatLongDate } from '@shared/dates';
@@ -50,7 +51,8 @@ export function MyLeavePage() {
           <p>File leave, print the form for signing, and follow its status.</p>
         </div>
         <button className="btn primary" onClick={() => setFiling(true)} disabled={!me.canFile}>
-          + File leave
+          <Plus size={16} aria-hidden />
+          File leave
         </button>
       </div>
       {!me.canFile && <div className="notice">{me.cannotFileReason}</div>}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import type { DivisionDto, EmployeeDto } from '@shared/api';
 import { ROLES, ROLE_LABELS, type Role } from '@shared/constants';
 import { api, errorText, fieldErrors } from '../api/client';
@@ -20,7 +21,8 @@ export function PeoplePage() {
           <p>Only addresses registered here can sign in. Use the person's govmail, or the personal email they give for staff without govmail and COS staff.</p>
         </div>
         <button className="btn primary" onClick={() => setEdit('new')}>
-          + Register a person
+          <Plus size={16} aria-hidden />
+          Register a person
         </button>
       </div>
       <div className="filters">

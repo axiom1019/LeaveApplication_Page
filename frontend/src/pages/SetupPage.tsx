@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
 import type { DivisionDto, EmployeeDto, SettingsDto } from '@shared/api';
 import { ROLE_LABELS, SECTIONS, SECTION_LABELS, SIGNATORIES, type Section, type Signatory } from '@shared/constants';
 import { formatLongDate } from '@shared/dates';
@@ -88,7 +89,8 @@ function Divisions() {
       </div>
       <div style={{ marginTop: 12 }}>
         <button className="btn" onClick={() => setEdit('new')}>
-          + Add division
+          <Plus size={16} aria-hidden />
+          Add division
         </button>
       </div>
       {edit && <DivisionForm d={edit === 'new' ? null : edit} people={people.data ?? []} onClose={() => setEdit(null)} onSaved={() => (setEdit(null), list.reload())} />}
