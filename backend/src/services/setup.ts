@@ -4,7 +4,7 @@ import { audit } from './audit';
 import { divisionRow, employeeRow, readSettings, toEmployee, writeSettings } from './model';
 
 /**
- * DHSUD Region 10 offices. Six divisions with five chiefs: Legal has no chief, and the Office of
+ * DHSUD Region 10 offices. Five divisions with their chiefs, plus the Legal Unit, which has no chief, and the Office of
  * the Regional Director has none either, so leave from both goes past the Division Chief step.
  */
 export const REGION_DIVISIONS = [
@@ -14,7 +14,7 @@ export const REGION_DIVISIONS = [
   { code: 'HOACDD', name: 'Homeowners Associations and Community Development Division', noChief: false },
   { code: 'ELUPDD', name: 'Environmental, Land Use and Urban Planning and Development Division', noChief: false },
   { code: 'PHSD', name: 'Public Housing and Settlements Division', noChief: false },
-  { code: 'LEGAL', name: 'Legal Division', noChief: true },
+  { code: 'LEGAL', name: 'Legal Unit', noChief: true },
 ] as const;
 
 /**
