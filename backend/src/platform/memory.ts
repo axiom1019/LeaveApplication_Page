@@ -69,7 +69,7 @@ function fakeSha256(s: string): string {
   return ((h1 >>> 0).toString(16) + (h2 >>> 0).toString(16)).padStart(16, '0');
 }
 
-export function createMemoryDeps(opts: { activeEmail?: string; ownerEmail?: string; nowMs?: number } = {}): MemoryDeps {
+export function createMemoryDeps(opts: { activeEmail?: string; ownerEmail?: string; extraAdminEmails?: string[]; nowMs?: number } = {}): MemoryDeps {
   let active = opts.activeEmail ?? '';
   let now = opts.nowMs ?? Date.UTC(2026, 11, 1, 1, 0, 0);
   let n = 0;
@@ -88,7 +88,7 @@ export function createMemoryDeps(opts: { activeEmail?: string; ownerEmail?: stri
       put: (k, v, ttl) => void cache.set(k, { v, exp: now + ttl * 1000 }),
       remove: (k) => void cache.delete(k),
     },
-    identity: { activeEmail: () => active, ownerEmail: () => opts.ownerEmail ?? 'region10@dhsud.gov.ph' },
+    identity: { activeEmail: () => active, ownerEmail: () => opts.ownerEmail ?? 'region10@dhsud.gov.ph', extraAdminEmails: () => opts.extraAdminEmails ?? [] },
     mail: { send: (to, subject, body) => void sent.push({ to, subject, body }), remainingQuota: () => 1500 - sent.length },
     files: {
       save: (kind, name, base64) => {

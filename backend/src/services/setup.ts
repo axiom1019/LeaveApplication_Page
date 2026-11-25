@@ -19,7 +19,7 @@ export const REGION_DIVISIONS = [
 
 /**
  * Creates the spreadsheet and its sheets (or adds what is missing), saves default settings and
- * registers the owner account as administrator and HR so they can register everyone else.
+ * registers the owner account (and any extra admin addresses) as administrator and HR so they can register everyone else.
  * Safe to run again.
  */
 export function initializeDatabase(deps: Deps): { url: string; created: boolean } {
@@ -35,14 +35,16 @@ export function initializeDatabase(deps: Deps): { url: string; created: boolean 
     }
     const divisionId = db.readAll('Divisions').find((r) => r.code.trim().toUpperCase() === 'ORD')?.division_id ?? db.readAll('Divisions')[0]?.division_id ?? '';
     const owner = deps.identity.ownerEmail().toLowerCase();
-    if (owner && !db.readAll('Employees').some((r) => toEmployee(r).email === owner)) {
+    const admins = [owner, ...deps.identity.extraAdminEmails().map((e) => e.trim().toLowerCase())].filter((e, i, all) => e && all.indexOf(e) === i);
+    for (const email of admins) {
+      if (db.readAll('Employees').some((r) => toEmployee(r).email === email)) continue;
       const now = new Date(deps.nowMs()).toISOString();
       const id = deps.uuid();
       db.append(
         'Employees',
         employeeRow({
           employeeId: id,
-          email: owner,
+          email,
           lastName: 'Administrator',
           firstName: 'System',
           middleName: '',
@@ -58,7 +60,7 @@ export function initializeDatabase(deps: Deps): { url: string; created: boolean 
           version: 1,
         }),
       );
-      audit(deps, id, owner, 'SETUP', 'database', { created: res.created });
+      audit(deps, id, email, 'SETUP', 'database', { created: res.created });
     }
   });
   return res;

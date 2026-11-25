@@ -3,6 +3,7 @@ import type { ApiResult } from '@shared/api';
 import { endpoints } from '../api/endpoints';
 import { PEOPLE, seededDeps } from '../testing/fixtures';
 import { initializeDatabase } from './setup';
+import { createMemoryDeps } from '../platform/memory';
 
 type Deps = ReturnType<typeof seededDeps>;
 
@@ -387,6 +388,15 @@ describe('setup', () => {
     expect(codes()).toEqual(['AFD', 'ELUPDD', 'HOACDD', 'HREDRD', 'LEGAL', 'ORD', 'PHSD', 'TSD']);
     initializeDatabase(deps);
     expect(codes()).toHaveLength(8);
+  });
+
+  it('registers the extra administrator addresses once, with the admin and HR roles', () => {
+    const deps = createMemoryDeps({ ownerEmail: PEOPLE.owner, activeEmail: PEOPLE.owner, extraAdminEmails: [' Second.Admin@gmail.com ', PEOPLE.owner] });
+    initializeDatabase(deps);
+    initializeDatabase(deps);
+    const people = ok(endpoints.api_listEmployees(deps, {}));
+    expect(people.map((p) => p.email).sort()).toEqual(['region10@dhsud.gov.ph', 'second.admin@gmail.com']);
+    expect(people.find((p) => p.email === 'second.admin@gmail.com')!.roles).toEqual(['ADMIN', 'HR']);
   });
 });
 

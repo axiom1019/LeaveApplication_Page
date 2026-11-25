@@ -5,6 +5,9 @@ import { TABLES, TABLE_NAMES, type ColumnOf, type RowOf, type TableName } from '
 import { AppError } from '../services/errors';
 import type { Db, DbProvider, Deps, Files } from './types';
 
+/** Written by scripts/assemble.mjs into Env.js. */
+declare const EXTRA_ADMIN_EMAILS: string[] | undefined;
+
 const DB_ID_KEY = 'DB_SPREADSHEET_ID';
 const GROW_ROWS = 500;
 
@@ -385,6 +388,7 @@ export function createGasDeps(environment: string): Deps {
     identity: {
       activeEmail: () => (Session.getActiveUser().getEmail() || '').toLowerCase(),
       ownerEmail: () => Session.getEffectiveUser().getEmail(),
+      extraAdminEmails: () => (typeof EXTRA_ADMIN_EMAILS === 'undefined' ? [] : EXTRA_ADMIN_EMAILS),
     },
     mail: {
       send: (to, subject, body) => MailApp.sendEmail({ to, subject: `${environment === 'production' ? '' : `[${environment.toUpperCase()}] `}${subject}`, body, name: `DHSUD R10 ${APP_NAME}` }),

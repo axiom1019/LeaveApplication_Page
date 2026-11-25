@@ -38,6 +38,8 @@ export interface Identity {
   activeEmail(): string;
   /** Account the app runs as (the deployment owner). */
   ownerEmail(): string;
+  /** More addresses setup registers as administrator and HR (from deploy/<env>/admins.local.json, kept out of git). */
+  extraAdminEmails(): string[];
 }
 
 export interface Mail {
