@@ -35,6 +35,7 @@ export const API_NAMES = [
   'api_saveCredits',
   'api_uploadSignature',
   'api_mySignature',
+  'api_saveMyProfile',
   'api_audit',
 ] as const satisfies readonly ApiName[];
 

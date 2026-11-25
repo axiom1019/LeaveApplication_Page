@@ -476,6 +476,15 @@ function SettingsTab() {
           </span>
         </label>
 
+        <div className="section-title">Profiles</div>
+        <label className="choice" style={{ marginBottom: 16 }}>
+          <input type="checkbox" checked={f.profileSelfEdit} onChange={(e) => setF({ ...f, profileSelfEdit: e.target.checked })} />
+          <span>
+            Let staff edit their own profile
+            <small>Under My profile, staff can correct their name, position and salary. Email, division, employment type and roles stay with HR. Every change is in the audit log.</small>
+          </span>
+        </label>
+
         <div className="section-title">Form header and notices</div>
         <div className="cols-2">
           <Field label="Agency name (form header)">

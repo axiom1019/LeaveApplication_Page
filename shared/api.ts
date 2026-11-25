@@ -42,6 +42,8 @@ export interface SettingsDto {
   pilotDivisionIds: string[];
   esignEnabled: boolean;
   hrNotifyEmail: string;
+  /** Staff may correct their own name, position and salary under My profile. */
+  profileSelfEdit: boolean;
 }
 
 export interface Me {
@@ -209,6 +211,7 @@ export interface ApiContract {
   api_saveCredits: [In<typeof S.saveCreditsInput>, CreditsDto[]];
   api_uploadSignature: [In<typeof S.uploadSignatureInput>, { ok: true }];
   api_mySignature: [Empty, { pngBase64: string | null }];
+  api_saveMyProfile: [In<typeof S.saveMyProfileInput>, EmployeeDto];
   api_audit: [In<typeof S.auditInput>, AuditDto[]];
 }
 export type ApiName = keyof ApiContract;

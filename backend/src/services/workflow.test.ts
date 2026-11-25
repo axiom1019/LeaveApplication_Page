@@ -400,6 +400,38 @@ describe('setup', () => {
   });
 });
 
+describe('own profile', () => {
+  it('lets staff correct their name, position and salary, but nothing HR keeps, and logs it', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.staff);
+    const me = ok(endpoints.api_session(deps, {})).me!.employee;
+    const input = { version: me.version, lastName: 'Bautista', firstName: 'Carlo', middleName: 'Reyes', position: 'Engineer III', salary: '51,000', roles: ['ADMIN'], divisionId: 'x' };
+    const saved = ok(endpoints.api_saveMyProfile(deps, input));
+    expect(saved.position).toBe('Engineer III');
+    expect(saved.middleName).toBe('Reyes');
+    expect(saved.roles).toEqual([]);
+    expect(saved.divisionId).toBe(me.divisionId);
+    // A second save with the old version is refused.
+    expect(err(endpoints.api_saveMyProfile(deps, input)).code).toBe('STALE_VERSION');
+    // The next application prints the new details.
+    expect(fileAs(deps, PEOPLE.staff).position).toBe('Engineer III');
+    as(deps, PEOPLE.owner);
+    expect(ok(endpoints.api_audit(deps, { entityId: me.employeeId })).some((a) => a.action === 'UPDATE_OWN_PROFILE')).toBe(true);
+  });
+
+  it('refuses when the administrator switches it off', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.owner);
+    const settings = ok(endpoints.api_getSettings(deps, {}));
+    expect(settings.profileSelfEdit).toBe(true);
+    ok(endpoints.api_saveSettings(deps, { ...settings, profileSelfEdit: false }));
+    as(deps, PEOPLE.staff);
+    const me = ok(endpoints.api_session(deps, {})).me!.employee;
+    const e = err(endpoints.api_saveMyProfile(deps, { version: me.version, lastName: 'X', firstName: 'Y', position: 'Z' }));
+    expect(e.code).toBe('FORBIDDEN');
+  });
+});
+
 describe('HR registration', () => {
   it('only an administrator can grant the HR role, and an email is registered once', () => {
     const deps = seededDeps();

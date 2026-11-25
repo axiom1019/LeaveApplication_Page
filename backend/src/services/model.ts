@@ -311,6 +311,7 @@ export const DEFAULT_SETTINGS: SettingsDto = {
   leaveCreditsMode: 'LEAVE_CARD' as LeaveCreditsMode,
   pilotDivisionIds: [],
   esignEnabled: false,
+  profileSelfEdit: true,
   hrNotifyEmail: '',
 };
 
@@ -332,6 +333,7 @@ export function readSettings(db: Db): SettingsDto {
     leaveCreditsMode: get('leaveCreditsMode'),
     pilotDivisionIds: get('pilotDivisionIds'),
     esignEnabled: get('esignEnabled'),
+    profileSelfEdit: get('profileSelfEdit'),
     hrNotifyEmail: get('hrNotifyEmail'),
   };
 }

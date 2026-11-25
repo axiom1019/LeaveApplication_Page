@@ -95,7 +95,9 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
         </div>
       </div>
       <p className="small muted" style={{ marginTop: -10, marginBottom: 16 }}>
-        If any of these is wrong, ask HR to correct your record before filing.
+        {boot.settings.profileSelfEdit
+          ? 'If any of these is wrong, correct it under My profile before filing (ask HR for the office/division).'
+          : 'If any of these is wrong, ask HR to correct your record before filing.'}
       </p>
 
       <div className="section-title">6.A Type of leave</div>

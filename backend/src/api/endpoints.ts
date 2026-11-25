@@ -158,6 +158,7 @@ export const endpoints: Endpoints = {
   api_saveCredits: authed('api_saveCredits', (deps, c, input) => admin.saveCredits(deps, c, parse(S.saveCreditsInput, input))),
   api_uploadSignature: authed('api_uploadSignature', (deps, c, input) => admin.uploadSignature(deps, c, parse(S.uploadSignatureInput, input).pngBase64)),
   api_mySignature: authed('api_mySignature', (deps, c) => admin.mySignature(deps, c)),
+  api_saveMyProfile: authed('api_saveMyProfile', (deps, c, input) => admin.saveMyProfile(deps, c, parse(S.saveMyProfileInput, input))),
   api_audit: authed('api_audit', (deps, c, input) => {
     requireRole(c, 'HR', 'ADMIN');
     const v = parse(S.auditInput, input);

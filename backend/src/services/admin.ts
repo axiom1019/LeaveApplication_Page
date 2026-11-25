@@ -1,5 +1,5 @@
 import type { CreditsDto, DivisionDto, EmployeeDto, OicDto, SettingsDto } from '@shared/api';
-import type { SaveEmployeeInput, SettingsInput } from '@shared/schemas';
+import type { SaveEmployeeInput, SaveMyProfileInput, SettingsInput } from '@shared/schemas';
 import type { Deps } from '../platform/types';
 import { audit } from './audit';
 import { requireRole, type Caller } from './auth';
@@ -81,6 +81,32 @@ export function saveEmployee(deps: Deps, c: Caller, input: SaveEmployeeInput): E
       before: prev ? { email: prev.email, roles: prev.roles, isActive: prev.isActive } : null,
     });
     return employeeDto(e, divisions);
+  });
+}
+
+/** Staff correct their own name, position and salary, when the administrator allows it (Settings). */
+export function saveMyProfile(deps: Deps, c: Caller, input: SaveMyProfileInput): EmployeeDto {
+  return deps.lock.run(() => {
+    const db = deps.db.get();
+    if (!readSettings(db).profileSelfEdit) throw new AppError('FORBIDDEN', 'Editing your own profile is switched off. Ask HR to correct your record.');
+    const row = db.findOne('Employees', 'employee_id', c.employee.employeeId);
+    if (!row) throw new AppError('NOT_FOUND', 'Employee not found.');
+    const prev = toEmployee(row);
+    if (prev.version !== input.version) throw new AppError('STALE_VERSION', 'Your record was changed in the meantime. Reload and try again.');
+    const e: Employee = {
+      ...prev,
+      lastName: input.lastName,
+      firstName: input.firstName,
+      middleName: input.middleName ?? '',
+      position: input.position,
+      salary: input.salary ?? '',
+      updatedAt: now(deps),
+      version: prev.version + 1,
+    };
+    db.replace('Employees', e.employeeId, employeeRow(e));
+    const pick = (x: Employee) => ({ lastName: x.lastName, firstName: x.firstName, middleName: x.middleName, position: x.position, salary: x.salary });
+    audit(deps, c.employee.employeeId, c.email, 'UPDATE_OWN_PROFILE', e.employeeId, { before: pick(prev), after: pick(e) });
+    return employeeDto(e, loadDivisions(db));
   });
 }
 

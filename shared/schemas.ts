@@ -109,6 +109,17 @@ export const saveEmployeeInput = z.object({
 });
 export type SaveEmployeeInput = z.infer<typeof saveEmployeeInput>;
 
+/** What staff may change on their own record. Email, division, employment type and roles stay with HR. */
+export const saveMyProfileInput = z.object({
+  version: z.number().int().nonnegative(),
+  lastName: text(80).min(1, 'Required'),
+  firstName: text(80).min(1, 'Required'),
+  middleName: text(80).optional(),
+  position: text(120).min(1, 'Required'),
+  salary: text(30).optional(),
+});
+export type SaveMyProfileInput = z.infer<typeof saveMyProfileInput>;
+
 export const saveDivisionInput = z.object({
   divisionId: z.string().max(64).optional(),
   name: text(120).min(1, 'Required'),
@@ -141,6 +152,7 @@ export const settingsInput = z.object({
   pilotDivisionIds: z.array(id).max(50),
   esignEnabled: z.boolean(),
   hrNotifyEmail: z.union([email, z.literal('')]),
+  profileSelfEdit: z.boolean(),
 });
 export type SettingsInput = z.infer<typeof settingsInput>;
 

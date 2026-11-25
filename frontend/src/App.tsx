@@ -8,6 +8,7 @@ import inbox from 'react-useanimations/lib/inbox';
 import list from 'react-useanimations/lib/list';
 import logOut from 'react-useanimations/lib/logOut';
 import settings from 'react-useanimations/lib/settings';
+import user from 'react-useanimations/lib/user';
 import users from 'react-useanimations/lib/users';
 import { APP_NAME, ROLE_LABELS } from '@shared/constants';
 import seal from './assets/seal.png';
@@ -16,11 +17,12 @@ import { Centered, Loading } from './components/ui';
 import { LoginPage } from './pages/LoginPage';
 import { AllApplicationsPage, InboxPage, MyLeavePage } from './pages/lists';
 import { PeoplePage } from './pages/PeoplePage';
+import { ProfilePage } from './pages/ProfilePage';
 import { SetupPage } from './pages/SetupPage';
 import { SignaturePage } from './pages/SignaturePage';
 import { Session, type SessionCtx } from './session';
 
-type Page = 'mine' | 'inbox' | 'all' | 'people' | 'setup' | 'signature';
+type Page = 'mine' | 'inbox' | 'all' | 'people' | 'setup' | 'signature' | 'profile';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -84,6 +86,7 @@ export function App() {
     ['people', 'People', hr],
     ['setup', 'Setup', hr || has('REGIONAL_DIRECTOR') || (has('SUPERVISING_AO') && ctx.boot.settings.leaveCreditsMode === 'TRACKED')],
     ['signature', 'My signature', me.isSignatory],
+    ['profile', 'My profile', true],
   ];
   const visible = sections.filter((n) => n[2]);
   const current = visible.some((n) => n[0] === page) ? page : 'mine';
@@ -183,6 +186,7 @@ export function App() {
                 {current === 'people' && <PeoplePage />}
                 {current === 'setup' && <SetupPage />}
                 {current === 'signature' && <SignaturePage />}
+                {current === 'profile' && <ProfilePage />}
               </div>
             </main>
           </div>
@@ -199,6 +203,7 @@ const NAV_ICONS: Record<Page, AnimatedIconData> = {
   people: users,
   setup: settings,
   signature: edit,
+  profile: user,
 };
 
 const todayLabel = () =>
