@@ -26,6 +26,8 @@ export interface Form6View {
   sections: Partial<Record<Section, SectionView>>;
   /** Seal image (PNG base64) for the header, optional. */
   sealBase64?: string | null;
+  /** The applicant's e-signature (PNG base64), printed over their name in 6.D when on file. */
+  applicantSignatureBase64?: string | null;
 }
 
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -153,7 +155,7 @@ export function renderForm6(view: Form6View): string {
         <td><div class="lbl">6.D COMMUTATION</div>
           <div class="opt">${box(app.commutation === 'NOT_REQUESTED')}Not Requested</div>
           <div class="opt">${box(app.commutation === 'REQUESTED')}Requested</div>
-          <div class="sigblock"><div class="sigmark">&nbsp;</div>
+          <div class="sigblock"><div class="sigmark">${view.applicantSignatureBase64 ? `<img class="sig" src="data:image/png;base64,${view.applicantSignatureBase64}" alt="signature">` : '&nbsp;'}</div>
             <div class="signame">${esc(`${app.firstName} ${app.middleName ? `${app.middleName.charAt(0)}. ` : ''}${app.lastName}`.toUpperCase())}</div>
             <div class="sigcap">(Signature of Applicant)</div></div>
         </td>

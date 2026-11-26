@@ -261,12 +261,11 @@ export function saveSettings(deps: Deps, c: Caller, input: SettingsInput): Setti
 
 const SIGNERS = ['DIVISION_CHIEF', 'SUPERVISING_AO', 'REGIONAL_DIRECTOR'] as const;
 
-/** Signatories (and anyone who may be named OIC) upload their own specimen signature. */
+/** Anyone uploads their own e-signature (specimen signature). */
 export function uploadSignature(deps: Deps, c: Caller, pngBase64: string): { ok: true } {
+  // Everyone may keep an e-signature: it prints as the applicant's signature on their own forms,
+  // and signatories also use it when they e-sign.
   const db = deps.db.get();
-  const isOicEver = db.readAll('OicAssignments').some((r) => r.employee_id === c.employee.employeeId && !r.deleted_at);
-  const isChief = [...loadDivisions(db).values()].some((d) => d.chiefEmployeeId === c.employee.employeeId);
-  if (!SIGNERS.some((r) => c.roles.has(r)) && !isOicEver && !isChief) throw new AppError('FORBIDDEN', 'Only signatories keep a specimen signature.');
   const fileId = deps.files.save('signature', `signature-${c.employee.employeeId}.png`, pngBase64, 'image/png');
   deps.lock.run(() => {
     const row = db.findOne('Employees', 'employee_id', c.employee.employeeId);

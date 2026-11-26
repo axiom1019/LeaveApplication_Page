@@ -22,6 +22,8 @@ export interface WellnessView {
   sections: Partial<Record<Section, SectionView>>;
   /** Wellness leave days left after this application; printed once the credits are certified. */
   remainingDays: number | null;
+  /** The applicant's e-signature (PNG base64), printed over their name when on file. */
+  applicantSignatureBase64?: string | null;
 }
 
 const CSS = `
@@ -36,7 +38,8 @@ const CSS = `
   .ctl { font-size: 8pt; line-height: 1.6; }
   .lbl { font-weight: bold; width: 38%; }
   .sect { font-weight: bold; text-align: center; background: #d9d9d9; }
-  .applicant { text-align: center; padding-top: 30px; }
+  .applicant { text-align: center; padding-top: 10px; }
+  .applicant .sig { margin-bottom: -6px; }
   .applicant .ln { display: inline-block; width: 55%; border-top: 1px solid #000; padding-top: 2px; font-weight: bold; }
   .cap { font-size: 8.5pt; }
   .sigblock { text-align: center; margin-top: 8px; }
@@ -86,6 +89,7 @@ export function renderWellnessForm(view: WellnessView): string {
       <tr><td class="lbl">Inclusive Date/s:</td><td>${esc(formatInclusiveDates(app.dates))}</td></tr>
       <tr><td class="lbl">Purpose of Leave:</td><td style="height:48px">${esc(purpose)}</td></tr>
       <tr><td colspan="2" class="applicant">
+        ${view.applicantSignatureBase64 ? `<img class="sig" src="data:image/png;base64,${view.applicantSignatureBase64}" alt="signature"><br>` : ''}
         <span class="ln">${esc(`${app.firstName} ${app.middleName ? `${app.middleName[0]}. ` : ''}${app.lastName}`.toUpperCase())}</span><br>
         <span class="cap">Signature of Applicant</span>
       </td></tr>

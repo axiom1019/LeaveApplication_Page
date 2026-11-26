@@ -88,7 +88,7 @@ export function App() {
     ['credits', 'Leave credits', hr || has('SUPERVISING_AO')],
     ['people', 'People', hr],
     ['setup', 'Setup', hr || has('REGIONAL_DIRECTOR')],
-    ['signature', 'My signature', me.isSignatory],
+    ['signature', 'My e-signature', true],
     ['profile', 'My profile', true],
   ];
   const visible = sections.filter((n) => n[2]);

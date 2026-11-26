@@ -33,8 +33,20 @@ export function form6Html(ctx: Ctx, app: Application, sigs: Map<number, Signatur
     }
     sections[step.section] = { section: step.section, name, title, signature: sig, imageBase64 };
   });
-  if (app.leaveType === 'WELLNESS') return renderWellnessForm({ app, settings: ctx.settings, sections, remainingDays: wellnessLeft(ctx, app) });
-  return renderForm6({ app, settings: ctx.settings, sections });
+  const applicantSignatureBase64 = applicantSignature(ctx, app);
+  if (app.leaveType === 'WELLNESS') return renderWellnessForm({ app, settings: ctx.settings, sections, remainingDays: wellnessLeft(ctx, app), applicantSignatureBase64 });
+  return renderForm6({ app, settings: ctx.settings, sections, applicantSignatureBase64 });
+}
+
+/** The applicant's e-signature, if they saved one under My e-signature. */
+function applicantSignature(ctx: Ctx, app: Application): string | null {
+  const fileId = ctx.employees.get(app.applicantId)?.signatureFileId;
+  if (!fileId) return null;
+  try {
+    return ctx.deps.files.readBase64(fileId);
+  } catch {
+    return null;
+  }
 }
 
 /** Wellness leave days the applicant has left in that year once this application is counted. */

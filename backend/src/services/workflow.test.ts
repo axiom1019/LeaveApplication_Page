@@ -3,6 +3,7 @@ import type { ApiResult } from '@shared/api';
 import { endpoints } from '../api/endpoints';
 import { PEOPLE, seededDeps } from '../testing/fixtures';
 import { initializeDatabase } from './setup';
+import { DHSUD_SEAL_PNG_BASE64 } from './seal';
 import { createMemoryDeps } from '../platform/memory';
 
 type Deps = ReturnType<typeof seededDeps>;
@@ -465,5 +466,17 @@ describe('HR registration', () => {
     ok(endpoints.api_saveEmployee(deps, { ...base, roles: [], isActive: false }));
     as(deps, PEOPLE.staff);
     expect(ok(endpoints.api_session(deps, {})).denied).toBe(true);
+  });
+});
+
+describe('applicant e-signature', () => {
+  it('lets any employee save an e-signature and prints it as the applicant signature on their form', () => {
+    const deps = seededDeps();
+    const app = fileAs(deps, PEOPLE.staff);
+    as(deps, PEOPLE.staff);
+    expect(ok(endpoints.api_formHtml(deps, { applicationId: app.applicationId })).html).not.toContain(DHSUD_SEAL_PNG_BASE64.slice(0, 80));
+    ok(endpoints.api_uploadSignature(deps, { pngBase64: DHSUD_SEAL_PNG_BASE64 }));
+    expect(ok(endpoints.api_mySignature(deps, {})).pngBase64).toBe(DHSUD_SEAL_PNG_BASE64);
+    expect(ok(endpoints.api_formHtml(deps, { applicationId: app.applicationId })).html).toContain(DHSUD_SEAL_PNG_BASE64.slice(0, 80));
   });
 });

@@ -21,7 +21,7 @@ function toPng(source: CanvasImageSource, w: number, h: number): string {
 }
 
 export function SignaturePage() {
-  const { boot, refreshMe } = useSession();
+  const { boot, me, refreshMe } = useSession();
   const toast = useToast();
   const [current, setCurrent] = useState<string | null | undefined>(undefined);
   const [draft, setDraft] = useState<string | null>(null);
@@ -88,11 +88,16 @@ export function SignaturePage() {
     <>
       <div className="page-head">
         <div>
-          <h1>My signature</h1>
-          <p>Your specimen signature is used only when you click E-sign. It is kept in a restricted folder that only the system can read.</p>
+          <h1>My e-signature</h1>
+          <p>
+            Your e-signature prints over your name as the applicant on the leave forms you file. If you sign for others, it is also used when you click E-sign. It
+            is kept in a restricted folder that only the system can read.
+          </p>
         </div>
       </div>
-      {!boot.settings.esignEnabled && <div className="notice">E-signing is not switched on yet. You can still prepare your signature now.</div>}
+      {!boot.settings.esignEnabled && me.isSignatory && (
+        <div className="notice">E-signing for signatories is not switched on yet. Your signature still prints on your own leave forms.</div>
+      )}
       {err && <div className="form-err">{err}</div>}
       <div className="detail-grid">
         <div className="card card-pad">
