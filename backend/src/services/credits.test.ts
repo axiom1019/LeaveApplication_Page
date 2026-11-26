@@ -44,14 +44,13 @@ describe('leave credits', () => {
     expect(addMonths('2025-12-05', 12)).toBe('2026-12-05');
   });
 
-  it('gives COS staff only CTO and Wellness Leave, and regular staff CTO but not wellness', () => {
+  it('gives COS staff only CTO and Wellness Leave, and regular staff those plus CSC leave', () => {
     const deps = seededDeps();
     expect(err(file(deps, PEOPLE.cos, 'VL', ['2026-12-07'], { location: 'PH' })).message).toContain('CTO or Wellness');
-    expect(err(file(deps, PEOPLE.staff, 'WELLNESS', ['2026-12-07'])).message).toContain('contract of service');
     as(deps, PEOPLE.cos);
     expect(ok(endpoints.api_myCredits(deps, {})).lines.map((l) => l.code)).toEqual(['CTO', 'WELLNESS']);
     as(deps, PEOPLE.staff);
-    expect(ok(endpoints.api_myCredits(deps, {})).lines.map((l) => l.code)).toEqual(['VL', 'SL', 'FL', 'SPL', 'CTO']);
+    expect(ok(endpoints.api_myCredits(deps, {})).lines.map((l) => l.code)).toEqual(['VL', 'SL', 'FL', 'SPL', 'WELLNESS', 'CTO']);
   });
 
   it('lets regular staff earn COC and file CTO in hours', () => {
@@ -306,5 +305,26 @@ describe('schedules that change week to week', () => {
     expect(err(endpoints.api_saveWeekSchedules(deps, { week: '2026-12-07', changes: [] })).code).toBe('FORBIDDEN');
     as(deps, PEOPLE.hr);
     expect(err(endpoints.api_weekSchedules(deps, { week: '2026-12-08' })).code).toBe('VALIDATION');
+  });
+});
+
+describe('special privilege leave and wellness for regular staff', () => {
+  it('refuses SPL for dates outside the year it is filed (filed Dec 29 for Jan 1 to 3)', () => {
+    const deps = seededDeps({ nowMs: Date.parse('2026-12-29T02:00:00Z') });
+    const e = err(file(deps, PEOPLE.staff, 'SPL', ['2027-01-04', '2027-01-05'], { location: 'PH' }));
+    expect(e.message).toContain('only be filed for dates in 2026');
+    expect(err(file(deps, PEOPLE.staff, 'SPL', ['2026-12-31', '2027-01-04'], { location: 'PH' })).message).toContain('2026');
+    ok(file(deps, PEOPLE.staff, 'SPL', ['2026-12-30', '2026-12-31'], { location: 'PH' }));
+  });
+
+  it('gives regular staff 5 days of wellness leave a year, printed on CSC Form No. 6', () => {
+    const deps = seededDeps();
+    const app = ok(file(deps, PEOPLE.staff, 'WELLNESS', ['2026-12-07', '2026-12-08']));
+    as(deps, PEOPLE.staff);
+    expect(ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'WELLNESS')!.available).toBe(3);
+    const html = ok(endpoints.api_formHtml(deps, { applicationId: app.applicationId })).html;
+    expect(html).toContain('APPLICATION FOR LEAVE');
+    expect(html).toContain('Wellness Leave');
+    expect(html).not.toContain('FORM-ASHRDD-031');
   });
 });

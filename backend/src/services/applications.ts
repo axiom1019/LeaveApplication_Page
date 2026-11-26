@@ -274,13 +274,21 @@ function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], wor
         ? 'Contract of service staff can file CTO or Wellness Leave only.'
         : code === 'SOLO'
           ? 'Solo parent leave is for staff HR has marked as solo parents.'
-          : 'Wellness Leave is for contract of service staff.';
+          : 'This leave type is not available to you.';
     throw new AppError('VALIDATION', msg, { fields: { leaveType: msg } });
   }
   const cap = maxHours ?? workingDays * WORK_SCHEDULE_INFO[me.workSchedule].hours;
   if (code === 'CTO' && hours !== undefined && hours > cap) {
     const msg = `${hours} hours is more than the ${workingDays} working day${workingDays === 1 ? '' : 's'} you picked (${cap} hours).`;
     throw new AppError('VALIDATION', msg, { fields: { 'details.hours': msg } });
+  }
+  if (code === 'SPL') {
+    // Special privilege leave is for the year it is filed in: filed on Dec 29 for Jan 1 to 3 is not allowed.
+    const year = ctx.today.slice(0, 4);
+    if (dates.some((d) => d.slice(0, 4) !== year)) {
+      const msg = `Special privilege leave can only be filed for dates in ${year}, the year you file it.`;
+      throw new AppError('VALIDATION', msg, { fields: { dates: msg } });
+    }
   }
   if (!['CTO', 'WELLNESS', 'SPL', 'SOLO'].includes(code)) return;
   const leaveYear = (dates[0] ?? ctx.today).slice(0, 4);

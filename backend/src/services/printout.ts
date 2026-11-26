@@ -34,7 +34,7 @@ export function form6Html(ctx: Ctx, app: Application, sigs: Map<number, Signatur
     sections[step.section] = { section: step.section, name, title, signature: sig, imageBase64 };
   });
   const applicantSignatureBase64 = applicantSignature(ctx, app);
-  if (app.leaveType === 'WELLNESS') return renderWellnessForm({ app, settings: ctx.settings, sections, remainingDays: wellnessLeft(ctx, app), applicantSignatureBase64 });
+  if (usesWellnessForm(ctx, app)) return renderWellnessForm({ app, settings: ctx.settings, sections, remainingDays: wellnessLeft(ctx, app), applicantSignatureBase64 });
   return renderForm6({ app, settings: ctx.settings, sections, applicantSignatureBase64 });
 }
 
@@ -47,6 +47,11 @@ function applicantSignature(ctx: Ctx, app: Application): string | null {
   } catch {
     return null;
   }
+}
+
+/** COS wellness leave prints on FORM-ASHRDD-031; regular staff's prints on CSC Form No. 6 (Others). */
+function usesWellnessForm(ctx: Ctx, app: Application): boolean {
+  return app.leaveType === 'WELLNESS' && ctx.employees.get(app.applicantId)?.employmentType === 'COS';
 }
 
 /** Wellness leave days the applicant has left in that year once this application is counted. */

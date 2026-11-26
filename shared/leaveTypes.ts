@@ -18,7 +18,7 @@ export const LEAVE_TYPES = [
   // these two. CTO prints under 6.A "Others" on CSC Form No. 6; Wellness Leave prints on the
   // region's own form, FORM-ASHRDD-031 (see backend/src/services/wellnessForm.ts).
   { code: 'CTO', label: 'Compensatory Time-Off (CTO)', basis: '', details: 'HOURS', for: 'ALL' },
-  { code: 'WELLNESS', label: 'Wellness Leave', basis: '', details: 'PURPOSE', for: 'COS' },
+  { code: 'WELLNESS', label: 'Wellness Leave', basis: '', details: 'PURPOSE', for: 'ALL' },
 ] as const;
 
 export type LeaveTypeCode = (typeof LEAVE_TYPES)[number]['code'];
@@ -28,8 +28,7 @@ export const LEAVE_TYPE_CODES = LEAVE_TYPES.map((t) => t.code) as [LeaveTypeCode
 export type EligibleFor = (typeof LEAVE_TYPES)[number]['for'];
 
 /**
- * The leave types a person may file: CSC leave for regular staff, Wellness for COS, CTO for both
- * (anyone can earn COC).
+ * The leave types a person may file: CSC leave for regular staff; CTO and Wellness for both.
  * Solo parent leave only for those HR marked as solo parents.
  */
 export function leaveTypesFor(e: { employmentType: string; soloParent?: boolean }) {

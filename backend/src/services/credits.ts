@@ -5,7 +5,7 @@
  * app adds 1.25 days of each for every month since, and deducts approved leave dated after it.
  * Forced leave (taken from VL) and special privilege leave have yearly allowances.
  * Everyone: CTO from the COCs HR records (hours, 8 to a day, lapsing after a year, oldest used
- * first). COS staff also get 5 days of wellness leave a year.
+ * first). Everyone also gets 5 days of wellness leave a year.
  * Leave that is filed but not yet decided is shown "on hold" and already counts against what is
  * available, so nobody files the same days twice.
  */
@@ -140,10 +140,12 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
   // "Earned" is what is still usable plus what was used, so earned − used = unexpired COC left.
   const ctoLine = line('CTO', 'Compensatory Time-Off (CTO)', (liveHours + usedHours) / h, usedHours / h, hoursOf(of(held, 'CTO')) / h, `${round(liveHours)} hours of unexpired COC left (${h} hours = 1 day). COCs lapse ${CREDIT_RULES.cocLapseMonths} months after they are earned.`);
 
+  const wellnessLine = line('WELLNESS', 'Wellness Leave', CREDIT_RULES.wellnessDays, days(of(approved, 'WELLNESS').filter(inYear)), days(of(held, 'WELLNESS').filter(inYear)), `${CREDIT_RULES.wellnessDays} days for ${year}, not carried over`);
+
   if (e.employmentType === 'COS') {
     lines.push(
       ctoLine,
-      line('WELLNESS', 'Wellness Leave', CREDIT_RULES.wellnessDays, days(of(approved, 'WELLNESS').filter(inYear)), days(of(held, 'WELLNESS').filter(inYear)), `${CREDIT_RULES.wellnessDays} days for ${year}, not carried over`),
+      wellnessLine,
     );
   } else {
     const months = asOf ? monthsBetween(asOf, today) : 0;
@@ -164,7 +166,7 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
     if (e.soloParent) {
       lines.push(line('SOLO', 'Solo Parent Leave', CREDIT_RULES.soloParentDays, days(of(approved, 'SOLO').filter(inYear)), days(of(held, 'SOLO').filter(inYear)), `${CREDIT_RULES.soloParentDays} days for ${year} (RA 8972), not carried over`));
     }
-    lines.push(ctoLine);
+    lines.push(wellnessLine, ctoLine);
   }
   return {
     employeeId: e.employeeId,

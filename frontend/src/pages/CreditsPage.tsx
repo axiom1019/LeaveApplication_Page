@@ -47,6 +47,7 @@ export function CreditsPage() {
                   <th className="num">Sick</th>
                   <th className="num">Forced</th>
                   <th className="num">Special privilege</th>
+                  <th className="num">Wellness</th>
                   <th className="num">CTO</th>
                   <th>Leave card as of</th>
                   <th />
@@ -63,6 +64,7 @@ export function CreditsPage() {
                     <td className="num">{c.asOf ? cell(avail(c, 'SL')) : <span className="muted">—</span>}</td>
                     <td className="num">{cell(avail(c, 'FL'))}</td>
                     <td className="num">{cell(avail(c, 'SPL'))}</td>
+                    <td className="num">{cell(avail(c, 'WELLNESS'))}</td>
                     <td className="num">{cell(avail(c, 'CTO'))}</td>
                     <td className="small">{c.asOf ? formatLongDate(c.asOf) : <span className="badge-warn">Not entered</span>}</td>
                     <td>
