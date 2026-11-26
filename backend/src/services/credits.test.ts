@@ -195,3 +195,29 @@ describe('solo parent leave', () => {
     expect(err(file(deps, PEOPLE.staff, 'SOLO', ['2026-12-14', '2026-12-15', '2026-12-16'])).message).toContain('2 days of Solo Parent Leave left');
   });
 });
+
+describe('HR adds and deducts CTO', () => {
+  it('lets HR deduct hours, oldest COC first, but not more than is left, and undo it', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-10-05', hours: 8, reference: 'OT-1' }));
+    ok(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-02', hours: 8, reference: 'OT-2' }));
+    expect(err(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-20', hours: 17, reference: 'Paper CTO', kind: 'DEDUCTED' })).message).toContain('Only 16 hours');
+    const after = ok(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-20', hours: 10, reference: 'Paper CTO', kind: 'DEDUCTED' }));
+    const ded = after.find((x) => x.kind === 'DEDUCTED')!;
+    expect(ded.hours).toBe(10);
+    expect(after.find((x) => x.reference === 'OT-1')!.remainingHours).toBe(0);
+    expect(after.find((x) => x.reference === 'OT-2')!.remainingHours).toBe(6);
+    as(deps, PEOPLE.cos);
+    const cto = ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'CTO')!;
+    expect(cto.available).toBe(0.75);
+    expect(cto.used).toBe(1.25);
+    // Undo the deduction.
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_deleteCoc(deps, { entryId: ded.entryId }));
+    as(deps, PEOPLE.cos);
+    expect(ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'CTO')!.available).toBe(2);
+    // Staff cannot change their own credits.
+    expect(err(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-20', hours: 8, reference: 'x' })).code).toBe('FORBIDDEN');
+  });
+});

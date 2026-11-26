@@ -174,8 +174,9 @@ export const employeeRef = z.object({ employeeId: id });
 export const saveCocInput = z.object({
   employeeId: id,
   earnedOn: isoDate,
-  hours: z.number().positive('Enter the hours earned').max(400),
-  reference: text(200).min(1, 'Enter the reference, such as the overtime authority or COC certificate'),
+  hours: z.number().positive('Enter the hours').max(400).multipleOf(0.5, 'Use whole or half hours'),
+  reference: text(200).min(1, 'Enter the reference or reason'),
+  kind: z.enum(['EARNED', 'DEDUCTED']).optional(),
 });
 export const deleteCocInput = z.object({ entryId: id });
 

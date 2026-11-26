@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Minus, Plus, Trash2 } from 'lucide-react';
 import type { CocDto, CreditsDto } from '@shared/api';
 import { formatLongDate } from '@shared/dates';
 import { api, errorText, fieldErrors } from '../api/client';
@@ -206,19 +206,21 @@ function BalanceForm(props: { credits: CreditsDto; onSaved: () => Promise<void> 
 
 function CocLedger(props: { employeeId: string; onChanged: () => Promise<void>; canEdit: boolean }) {
   const list = useLoad<CocDto[]>(() => api('api_listCoc', { employeeId: props.employeeId }), [props.employeeId]);
+  const [kind, setKind] = useState<'EARNED' | 'DEDUCTED'>('EARNED');
   const [f, setF] = useState({ earnedOn: '', hours: '', reference: '' });
   const [err, setErr] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const deduct = kind === 'DEDUCTED';
   return (
     <>
-      <div className="section-title">Compensatory overtime credits (COC)</div>
+      <div className="section-title">CTO credits (COC)</div>
       {err && <div className="form-err">{err}</div>}
       {props.canEdit && (
         <form
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              list.setData(await api('api_saveCoc', { employeeId: props.employeeId, earnedOn: f.earnedOn, hours: Number(f.hours), reference: f.reference }));
+              list.setData(await api('api_saveCoc', { employeeId: props.employeeId, earnedOn: f.earnedOn, hours: Number(f.hours), reference: f.reference, kind }));
               setF({ earnedOn: '', hours: '', reference: '' });
               setErr('');
               setErrors({});
@@ -229,20 +231,36 @@ function CocLedger(props: { employeeId: string; onChanged: () => Promise<void>; 
             }
           }}
         >
+          <div className="type-grid" style={{ marginBottom: 12 }}>
+            <label className="choice">
+              <input type="radio" name="coc-kind" checked={!deduct} onChange={() => setKind('EARNED')} />
+              <span>
+                Add COC earned
+                <small>Approved overtime: adds CTO hours that lapse after a year.</small>
+              </span>
+            </label>
+            <label className="choice">
+              <input type="radio" name="coc-kind" checked={deduct} onChange={() => setKind('DEDUCTED')} />
+              <span>
+                Deduct hours
+                <small>CTO taken outside the app, or a correction. Uses the oldest COC first.</small>
+              </span>
+            </label>
+          </div>
           <div className="cols-3">
-            <Field label="Date earned" error={errors.earnedOn}>
+            <Field label={deduct ? 'Date' : 'Date earned'} error={errors.earnedOn}>
               <input type="date" value={f.earnedOn} onChange={(e) => setF({ ...f, earnedOn: e.target.value })} required />
             </Field>
-            <Field label="Hours" error={errors.hours} hint="8 hours = 1 day of CTO">
+            <Field label={deduct ? 'Hours to deduct' : 'Hours earned'} error={errors.hours} hint="8 hours = 1 day of CTO">
               <input type="number" step="0.5" min="0.5" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} required />
             </Field>
-            <Field label="Reference" error={errors.reference} hint="Overtime authority or COC certificate">
+            <Field label={deduct ? 'Reason' : 'Reference'} error={errors.reference} hint={deduct ? 'For example: CTO on paper, Dec 2' : 'Overtime authority or COC certificate'}>
               <input type="text" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} maxLength={200} required />
             </Field>
           </div>
-          <button className="btn primary" type="submit" style={{ marginBottom: 16 }}>
-            <Plus size={16} aria-hidden />
-            Add COC
+          <button className={deduct ? 'btn' : 'btn primary'} type="submit" style={{ marginBottom: 16 }}>
+            {deduct ? <Minus size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
+            {deduct ? 'Deduct hours' : 'Add COC'}
           </button>
         </form>
       )}
@@ -254,11 +272,12 @@ function CocLedger(props: { employeeId: string; onChanged: () => Promise<void>; 
             <table className="grid">
               <thead>
                 <tr>
-                  <th>Earned</th>
+                  <th>Date</th>
+                  <th>Entry</th>
                   <th className="num">Hours</th>
                   <th className="num">Left</th>
                   <th>Lapses</th>
-                  <th>Reference</th>
+                  <th>Reference or reason</th>
                   <th />
                 </tr>
               </thead>
@@ -266,15 +285,16 @@ function CocLedger(props: { employeeId: string; onChanged: () => Promise<void>; 
                 {list.data.map((x) => (
                   <tr key={x.entryId}>
                     <td className="small">{formatLongDate(x.earnedOn)}</td>
-                    <td className="num">{x.hours}</td>
-                    <td className="num">{x.remainingHours}</td>
-                    <td className="small">{formatLongDate(x.expiresOn)}</td>
+                    <td className="small">{x.kind === 'DEDUCTED' ? 'Deducted' : 'Earned'}</td>
+                    <td className="num">{x.kind === 'DEDUCTED' ? `−${x.hours}` : x.hours}</td>
+                    <td className="num">{x.kind === 'DEDUCTED' ? '' : x.remainingHours}</td>
+                    <td className="small">{x.expiresOn ? formatLongDate(x.expiresOn) : ''}</td>
                     <td className="small">{x.reference}</td>
                     <td>
                       {props.canEdit && (
                         <button
                           className="btn"
-                          aria-label="Remove this COC"
+                          aria-label={x.kind === 'DEDUCTED' ? 'Remove this deduction' : 'Remove this COC'}
                           onClick={async () => {
                             try {
                               list.setData(await api('api_deleteCoc', { entryId: x.entryId }));

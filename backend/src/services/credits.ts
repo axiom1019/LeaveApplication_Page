@@ -15,7 +15,7 @@ import type { Db, Deps } from '../platform/types';
 import { audit } from './audit';
 import { requireRole, type Caller } from './auth';
 import { AppError } from './errors';
-import { fullName, loadDivisions, loadEmployees, toApplication, type Application, type Division, type Employee } from './model';
+import { fullName, loadDivisions, loadEmployees, toApplication, toEmployee, type Application, type Division, type Employee } from './model';
 import { formatLongDate, manilaDate } from '@shared/dates';
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
@@ -64,11 +64,16 @@ function cocEntries(db: Db, employeeId: string): CocEntry[] {
  * not yet lapsed on it. Returns each entry's remaining hours.
  */
 function cocRemaining(entries: CocEntry[], approvedCto: Application[]): Map<string, number> {
-  const left = new Map(entries.map((e) => [e.entryId, e.hours]));
-  const uses = approvedCto.map((a) => ({ date: a.dates[0] ?? '', hours: ctoHours(a) })).sort((a, b) => a.date.localeCompare(b.date));
+  const earned = entries.filter((e) => e.hours > 0);
+  const left = new Map(earned.map((e) => [e.entryId, e.hours]));
+  // HR's manual deductions (negative entries) are used up the same way as approved CTO.
+  const uses = [
+    ...approvedCto.map((a) => ({ date: a.dates[0] ?? '', hours: ctoHours(a) })),
+    ...entries.filter((e) => e.hours < 0).map((e) => ({ date: e.earnedOn, hours: -e.hours })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
   for (const u of uses) {
     let need = u.hours;
-    for (const e of entries) {
+    for (const e of earned) {
       if (need <= 0) break;
       if (e.earnedOn > u.date || addMonths(e.earnedOn, CREDIT_RULES.cocLapseMonths) <= u.date) continue;
       const take = Math.min(need, left.get(e.entryId) ?? 0);
@@ -78,6 +83,9 @@ function cocRemaining(entries: CocEntry[], approvedCto: Application[]): Map<stri
   }
   return left;
 }
+
+/** Hours HR deducted by hand (CTO taken outside the app, corrections). */
+const deductedHours = (entries: CocEntry[]) => entries.filter((e) => e.hours < 0).reduce((n, e) => n - e.hours, 0);
 
 const days = (apps: Application[]) => apps.reduce((n, a) => n + a.workingDays, 0);
 /** Hours of COC a CTO application uses: the hours the applicant chose, or whole days for older ones. */
@@ -105,8 +113,8 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
   if (e.employmentType === 'COS') {
     const entries = cocEntries(db, e.employeeId);
     const left = cocRemaining(entries, of(approved, 'CTO'));
-    const liveHours = entries.filter((x) => addMonths(x.earnedOn, CREDIT_RULES.cocLapseMonths) > today).reduce((n, x) => n + (left.get(x.entryId) ?? 0), 0);
-    const usedHours = hoursOf(of(approved, 'CTO'));
+    const liveHours = entries.filter((x) => x.hours > 0 && addMonths(x.earnedOn, CREDIT_RULES.cocLapseMonths) > today).reduce((n, x) => n + (left.get(x.entryId) ?? 0), 0);
+    const usedHours = hoursOf(of(approved, 'CTO')) + deductedHours(entries);
     const h = CREDIT_RULES.hoursPerDay;
     // "Earned" is what is still usable plus what was used, so earned − used = unexpired COC left.
     lines.push(
@@ -186,31 +194,45 @@ export function listCoc(deps: Deps, c: Caller, employeeId: string): CocDto[] {
   const t = today(deps);
   return entries
     .map((e) => {
+      if (e.hours < 0) return { ...e, kind: 'DEDUCTED' as const, hours: -e.hours, expiresOn: '', remainingHours: 0 };
       const expiresOn = addMonths(e.earnedOn, CREDIT_RULES.cocLapseMonths);
-      return { ...e, expiresOn, remainingHours: expiresOn > t ? round(left.get(e.entryId) ?? 0) : 0 };
+      return { ...e, kind: 'EARNED' as const, expiresOn, remainingHours: expiresOn > t ? round(left.get(e.entryId) ?? 0) : 0 };
     })
     .reverse();
 }
 
-export function saveCoc(deps: Deps, c: Caller, input: { employeeId: string; earnedOn: string; hours: number; reference: string }): CocDto[] {
+/** HR adds COC earned (overtime) or deducts hours (CTO taken outside the app, corrections). */
+export function saveCoc(deps: Deps, c: Caller, input: { employeeId: string; earnedOn: string; hours: number; reference: string; kind?: 'EARNED' | 'DEDUCTED' }): CocDto[] {
   canManage(c);
   deps.lock.run(() => {
     const db = deps.db.get();
     const e = db.findOne('Employees', 'employee_id', input.employeeId);
     if (!e) throw new AppError('NOT_FOUND', 'Employee not found.');
-    if (input.earnedOn > today(deps)) throw new AppError('VALIDATION', 'The COC date is in the future.', { fields: { earnedOn: 'Use the date the overtime was rendered' } });
+    const deduct = input.kind === 'DEDUCTED';
+    if (input.earnedOn > today(deps)) {
+      throw new AppError('VALIDATION', deduct ? 'The date is in the future.' : 'The COC date is in the future.', { fields: { earnedOn: deduct ? 'Use the date the CTO was taken' : 'Use the date the overtime was rendered' } });
+    }
+    if (deduct) {
+      const emp = toEmployee(e);
+      const cto = creditsFor(db, emp, loadDivisions(db), today(deps)).lines.find((l) => l.code === 'CTO');
+      const leftHours = round(Math.max(0, cto?.available ?? 0) * CREDIT_RULES.hoursPerDay);
+      if (input.hours > leftHours + 1e-9) {
+        const msg = `Only ${leftHours} hours of CTO are left to deduct.`;
+        throw new AppError('VALIDATION', msg, { fields: { hours: msg } });
+      }
+    }
     const entryId = deps.uuid();
     db.append('CocEntries', {
       entry_id: entryId,
       employee_id: input.employeeId,
       earned_on: input.earnedOn,
-      hours: String(input.hours),
+      hours: String(deduct ? -input.hours : input.hours),
       reference: input.reference,
       created_by: c.employee.employeeId,
       created_at: new Date(deps.nowMs()).toISOString(),
       deleted_at: '',
     });
-    audit(deps, c.employee.employeeId, c.email, 'ADD_COC', input.employeeId, { entryId, ...input });
+    audit(deps, c.employee.employeeId, c.email, deduct ? 'DEDUCT_CTO' : 'ADD_COC', input.employeeId, { entryId, ...input });
   });
   return listCoc(deps, c, input.employeeId);
 }

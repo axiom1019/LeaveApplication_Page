@@ -194,6 +194,8 @@ export interface CocDto {
   reference: string;
   expiresOn: string;
   remainingHours: number;
+  /** EARNED: COC from overtime. DEDUCTED: hours HR took off by hand. */
+  kind: 'EARNED' | 'DEDUCTED';
 }
 
 export interface AuditDto {
