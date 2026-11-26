@@ -1,4 +1,4 @@
-import type { ApplicationStatus, EmploymentType, ErrorCode, LeaveCreditsMode, Role, Section, SignMethod, Signatory } from './constants';
+import type { ApplicationStatus, EmploymentType, WorkSchedule, ErrorCode, LeaveCreditsMode, Role, Section, SignMethod, Signatory } from './constants';
 import type { LeaveTypeCode } from './leaveTypes';
 import type { z } from 'zod';
 import type * as S from './schemas';
@@ -19,6 +19,7 @@ export interface EmployeeDto {
   salary: string;
   employmentType: EmploymentType;
   soloParent: boolean;
+  workSchedule: WorkSchedule;
   roles: Role[];
   isActive: boolean;
   hasSignature: boolean;
@@ -186,6 +187,16 @@ export interface CreditsDto {
   lines: CreditLine[];
 }
 
+/** A month's late and undertime HR recorded, and the VL it takes. */
+export interface TardinessDto {
+  entryId: string;
+  employeeId: string;
+  month: string;
+  minutes: number;
+  remarks: string;
+  days: number;
+}
+
 export interface CocDto {
   entryId: string;
   employeeId: string;
@@ -246,6 +257,9 @@ export interface ApiContract {
   api_listCoc: [In<typeof S.employeeRef>, CocDto[]];
   api_saveCoc: [In<typeof S.saveCocInput>, CocDto[]];
   api_deleteCoc: [In<typeof S.deleteCocInput>, CocDto[]];
+  api_listTardiness: [In<typeof S.employeeRef>, TardinessDto[]];
+  api_saveTardiness: [In<typeof S.saveTardinessInput>, TardinessDto[]];
+  api_deleteTardiness: [In<typeof S.deleteTardinessInput>, TardinessDto[]];
   api_uploadSignature: [In<typeof S.uploadSignatureInput>, { ok: true }];
   api_mySignature: [Empty, { pngBase64: string | null }];
   api_saveMyProfile: [In<typeof S.saveMyProfileInput>, EmployeeDto];

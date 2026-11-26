@@ -41,6 +41,21 @@ export const SECTION_LABELS: Record<Section, string> = {
   '7C': '7.C/7.D Approval or disapproval',
 };
 
+/**
+ * Work schedules (DHSUD Region 10). Compressed: Monday to Thursday, 7:00 AM to 6:00 PM (10 hours),
+ * so a leave day takes 1.25 days of credit (10 / 8) and a half day 0.625. Standard (skeletal or
+ * regular): 8-hour days, Monday to Friday (skeletal: 7 AM to 4 PM Monday to Thursday, 8 AM to 5 PM
+ * Friday), so a day takes 1 day of credit.
+ */
+export const WORK_SCHEDULES = ['STANDARD', 'COMPRESSED'] as const;
+export type WorkSchedule = (typeof WORK_SCHEDULES)[number];
+export const WORK_SCHEDULE_INFO: Record<WorkSchedule, { label: string; hours: number; weekdays: readonly number[] }> = {
+  STANDARD: { label: 'Skeletal / regular: 8 hours a day, Monday to Friday', hours: 8, weekdays: [1, 2, 3, 4, 5] },
+  COMPRESSED: { label: 'Compressed: 7:00 AM to 6:00 PM, Monday to Thursday (10 hours)', hours: 10, weekdays: [1, 2, 3, 4] },
+};
+/** Days of leave credit one working day of leave takes (leave credits are counted in 8-hour days). */
+export const creditPerDay = (s: WorkSchedule) => WORK_SCHEDULE_INFO[s].hours / 8;
+
 export const EMPLOYMENT_TYPES = ['REGULAR', 'COS'] as const;
 export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
 

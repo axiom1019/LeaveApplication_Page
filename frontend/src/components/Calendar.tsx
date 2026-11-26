@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { dateRange, isWeekend, normalizeDates } from '@shared/dates';
+import { dateRange, normalizeDates, weekday } from '@shared/dates';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /**
  * Pick inclusive dates. Click a day to add or remove it; Shift-click (or use "Select range")
- * to add every day from the last one picked. Weekends and holidays are shown but not counted.
+ * to add every day from the last one picked. Days off (weekends, or Fridays on a compressed week) and holidays are shown but not counted.
  */
-export function DatePicker(props: { value: string[]; onChange: (v: string[]) => void; holidays: Map<string, string>; today: string }) {
+export function DatePicker(props: { value: string[]; onChange: (v: string[]) => void; holidays: Map<string, string>; today: string; weekdays?: readonly number[] }) {
+  const workdays = props.weekdays ?? [1, 2, 3, 4, 5];
+  const isOff = (d: string) => !workdays.includes(weekday(d));
   const [month, setMonth] = useState(() => (props.value[0] ?? props.today).slice(0, 7));
   const [anchor, setAnchor] = useState<string | null>(null);
   const [rangeMode, setRangeMode] = useState(false);
@@ -28,7 +30,7 @@ export function DatePicker(props: { value: string[]; onChange: (v: string[]) => 
     if ((withShift || rangeMode) && anchor) {
       const [a, b] = anchor < d ? [anchor, d] : [d, anchor];
       // A range adds working days only; weekends and holidays inside it stay out.
-      const add = dateRange(a, b).filter((x) => !isWeekend(x) && !props.holidays.has(x));
+      const add = dateRange(a, b).filter((x) => !isOff(x) && !props.holidays.has(x));
       props.onChange(normalizeDates([...props.value, ...add]));
       setAnchor(null);
       setRangeMode(false);
@@ -61,14 +63,14 @@ export function DatePicker(props: { value: string[]; onChange: (v: string[]) => 
         {cells.map((d, i) => {
           if (!d) return <button key={`e${i}`} type="button" className="cal-day" disabled aria-hidden="true" tabIndex={-1} />;
           const hol = props.holidays.get(d);
-          const cls = ['cal-day', isWeekend(d) ? 'off' : '', hol ? 'hol' : '', selected.has(d) ? 'sel' : '', d === props.today ? 'today' : ''].join(' ');
+          const cls = ['cal-day', isOff(d) ? 'off' : '', hol ? 'hol' : '', selected.has(d) ? 'sel' : '', d === props.today ? 'today' : ''].join(' ');
           return (
             <button
               key={d}
               type="button"
               className={cls}
               aria-pressed={selected.has(d)}
-              title={hol ?? (isWeekend(d) ? 'Weekend' : undefined)}
+              title={hol ?? (isOff(d) ? 'Day off' : undefined)}
               aria-label={`${d}${hol ? `, holiday: ${hol}` : ''}`}
               onClick={(e) => click(d, e.shiftKey)}
             >
@@ -88,7 +90,7 @@ export function DatePicker(props: { value: string[]; onChange: (v: string[]) => 
         </span>
         <span>
           <i style={{ background: '#f1f5f9', border: '1px solid var(--line)' }} />
-          Weekend
+          Day off
         </span>
       </div>
       <div className="actions" style={{ marginTop: 8 }}>

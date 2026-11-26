@@ -67,6 +67,7 @@ export function saveEmployee(deps: Deps, c: Caller, input: SaveEmployeeInput): E
       salary: input.salary ?? '',
       employmentType: input.employmentType,
       soloParent: input.employmentType === 'COS' ? false : !!input.soloParent,
+      workSchedule: input.workSchedule ?? prev?.workSchedule ?? 'STANDARD',
       roles,
       signatureFileId: prev?.signatureFileId ?? '',
       isActive: input.isActive,
@@ -81,7 +82,8 @@ export function saveEmployee(deps: Deps, c: Caller, input: SaveEmployeeInput): E
       roles: e.roles,
       isActive: e.isActive,
       soloParent: e.soloParent,
-      before: prev ? { email: prev.email, roles: prev.roles, isActive: prev.isActive, soloParent: prev.soloParent } : null,
+      workSchedule: e.workSchedule,
+      before: prev ? { email: prev.email, roles: prev.roles, isActive: prev.isActive, soloParent: prev.soloParent, workSchedule: prev.workSchedule } : null,
     });
     return employeeDto(e, divisions);
   });

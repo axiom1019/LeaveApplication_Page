@@ -1,6 +1,6 @@
 import type { ApplicationDetail, ApplicationSummary, SettingsDto, SignatureDto, StepDto } from '@shared/api';
-import { ROLE_LABELS, SECTION_LABELS, STATUS_LABELS, type Section } from '@shared/constants';
-import { countWorkingDays, formatInclusiveDates, manilaDate, manilaDateTime, normalizeDates } from '@shared/dates';
+import { WORK_SCHEDULE_INFO, creditPerDay, ROLE_LABELS, SECTION_LABELS, STATUS_LABELS, type Section } from '@shared/constants';
+import { countWorkingDays, formatInclusiveDates, manilaDate, manilaDateTime, normalizeDates, workingDates } from '@shared/dates';
 import { CREDIT_RULES, leaveType, leaveTypesFor } from '@shared/leaveTypes';
 import { creditsFor } from './credits';
 import type { LeaveForm, SignInput } from '@shared/schemas';
@@ -203,7 +203,7 @@ function creditsPrefill(ctx: Ctx, app: Application): ApplicationDetail['creditsP
   };
   const vl = before('VL');
   const sl = before('SL');
-  const days = app.workingDays;
+  const days = app.creditDays;
   // Forced leave is charged to vacation leave; special privilege leave has its own 3-day credit.
   const lessVl = app.leaveType === 'VL' || app.leaveType === 'FL' ? days : 0;
   const lessSl = app.leaveType === 'SL' ? days : 0;
@@ -275,8 +275,9 @@ function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], wor
           : 'Wellness Leave is for contract of service staff.';
     throw new AppError('VALIDATION', msg, { fields: { leaveType: msg } });
   }
-  if (code === 'CTO' && hours !== undefined && hours > workingDays * CREDIT_RULES.hoursPerDay) {
-    const msg = `${hours} hours is more than the ${workingDays} working day${workingDays === 1 ? '' : 's'} you picked (${workingDays * CREDIT_RULES.hoursPerDay} hours).`;
+  const dayHours = WORK_SCHEDULE_INFO[me.workSchedule].hours;
+  if (code === 'CTO' && hours !== undefined && hours > workingDays * dayHours) {
+    const msg = `${hours} hours is more than the ${workingDays} working day${workingDays === 1 ? '' : 's'} you picked (${workingDays * dayHours} hours).`;
     throw new AppError('VALIDATION', msg, { fields: { 'details.hours': msg } });
   }
   if (!['CTO', 'WELLNESS', 'SPL', 'SOLO'].includes(code)) return;
@@ -318,9 +319,16 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
     if (block) throw new AppError('FORBIDDEN', block);
 
     const dates = normalizeDates(form.dates);
-    const workingDays = countWorkingDays(dates, ctx.holidays);
+    const sched = WORK_SCHEDULE_INFO[me.workSchedule];
+    const workDates = workingDates(dates, ctx.holidays, sched.weekdays);
+    const halfDays = normalizeDates(form.details.halfDays ?? []);
+    if (halfDays.some((d) => !workDates.includes(d))) {
+      throw new AppError('VALIDATION', 'A half day must be one of your working days in the dates picked.', { fields: { 'details.halfDays': 'Pick half days among your working days' } });
+    }
+    const workingDays = countWorkingDays(dates, ctx.holidays, sched.weekdays, halfDays);
     if (workingDays === 0 && form.leaveType !== 'ML') {
-      throw new AppError('VALIDATION', 'The dates you picked are all weekends or holidays.', { fields: { dates: 'Pick at least one working day' } });
+      const off = me.workSchedule === 'COMPRESSED' ? 'days off (Friday to Sunday on your compressed week)' : 'weekends';
+      throw new AppError('VALIDATION', `The dates you picked are all ${off} or holidays.`, { fields: { dates: 'Pick at least one working day' } });
     }
     const mine = new Set(dates);
     const clash = existing.find((a) => a.applicantId === me.employeeId && !CLOSED.has(a.status) && a.dates.some((d) => mine.has(d)));
@@ -337,14 +345,14 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
     // Keep only the 6.B details that belong to the chosen type.
     const kind = leaveType(form.leaveType).details;
     const keep: Record<string, (keyof typeof details)[]> = {
-      LOCATION: ['location', 'locationText'],
-      SICK: ['sick', 'illness'],
-      ILLNESS: ['illness'],
-      STUDY: ['study'],
-      OTHER: ['otherPurpose'],
-      PURPOSE: ['purpose'],
-      HOURS: ['hours'],
-      NONE: [],
+      LOCATION: ['location', 'locationText', 'halfDays'],
+      SICK: ['sick', 'illness', 'halfDays'],
+      ILLNESS: ['illness', 'halfDays'],
+      STUDY: ['study', 'halfDays'],
+      OTHER: ['otherPurpose', 'halfDays'],
+      PURPOSE: ['purpose', 'halfDays'],
+      HOURS: ['hours', 'halfDays'],
+      NONE: ['halfDays'],
     };
     for (const k of Object.keys(details) as (keyof typeof details)[]) if (!keep[kind]?.includes(k)) delete details[k];
 
@@ -365,6 +373,7 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
       details,
       dates,
       workingDays,
+      creditDays: Math.round(workingDays * creditPerDay(me.workSchedule) * 1000) / 1000,
       commutation: form.commutation,
       flow: flowFor(ctx, me),
       currentStep: 0,

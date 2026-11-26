@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Minus, Plus, Trash2 } from 'lucide-react';
-import type { CocDto, CreditsDto } from '@shared/api';
+import type { CocDto, CreditsDto, TardinessDto } from '@shared/api';
 import { formatLongDate } from '@shared/dates';
 import { api, errorText, fieldErrors } from '../api/client';
 import { CreditsTable, creditsCaption } from '../components/CreditsTable';
@@ -156,6 +156,11 @@ function CreditsDialog(props: { credits: CreditsDto; onClose: () => void; onChan
       </p>
       {c.employmentType !== 'COS' &&
         (canEdit ? <BalanceForm credits={c} onSaved={refresh} /> : <p className="small muted">Only HR and the administrator can change balances.</p>)}
+      {c.employmentType !== 'COS' && (
+        <div style={{ marginTop: 24 }}>
+          <TardinessLedger employeeId={c.employeeId} onChanged={refresh} canEdit={canEdit} />
+        </div>
+      )}
       <div style={{ marginTop: c.employmentType === 'COS' ? 0 : 24 }}>
         <CocLedger employeeId={c.employeeId} onChanged={refresh} canEdit={canEdit} />
       </div>
@@ -298,6 +303,108 @@ function CocLedger(props: { employeeId: string; onChanged: () => Promise<void>; 
                           onClick={async () => {
                             try {
                               list.setData(await api('api_deleteCoc', { entryId: x.entryId }));
+                              await props.onChanged();
+                            } catch (e2) {
+                              setErr(errorText(e2));
+                            }
+                          }}
+                        >
+                          <Trash2 size={16} aria-hidden />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+        <Loading error={list.error} />
+      )}
+    </>
+  );
+}
+
+/** Monthly late and undertime HR records; each month comes off VL at hours / 8 + minutes / 480. */
+function TardinessLedger(props: { employeeId: string; onChanged: () => Promise<void>; canEdit: boolean }) {
+  const list = useLoad<TardinessDto[]>(() => api('api_listTardiness', { employeeId: props.employeeId }), [props.employeeId]);
+  const [f, setF] = useState({ month: '', hours: '', minutes: '', remarks: '' });
+  const [err, setErr] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const total = (Number(f.hours) || 0) * 60 + (Number(f.minutes) || 0);
+  const monthLabel = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString('en-PH', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const hm = (min: number) => `${Math.floor(min / 60)}h ${min % 60}m`;
+  return (
+    <>
+      <div className="section-title">Late and undertime (deducted from VL)</div>
+      {err && <div className="form-err">{err}</div>}
+      {props.canEdit && (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              list.setData(await api('api_saveTardiness', { employeeId: props.employeeId, month: f.month, minutes: total, remarks: f.remarks || undefined }));
+              setF({ month: '', hours: '', minutes: '', remarks: '' });
+              setErr('');
+              setErrors({});
+              await props.onChanged();
+            } catch (x) {
+              setErr(errorText(x));
+              setErrors(fieldErrors(x));
+            }
+          }}
+        >
+          <div className="cols-3">
+            <Field label="Month" error={errors.month}>
+              <input type="month" value={f.month} onChange={(e) => setF({ ...f, month: e.target.value })} required />
+            </Field>
+            <Field label="Total late and undertime" error={errors.minutes} hint={total ? `= ${Math.round((total / 480) * 1000) / 1000} day of VL (hours ÷ 8 + minutes ÷ 480)` : 'Hours and minutes for the whole month'}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" min="0" step="1" placeholder="Hours" aria-label="Hours" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} />
+                <input type="number" min="0" max="59" step="1" placeholder="Minutes" aria-label="Minutes" value={f.minutes} onChange={(e) => setF({ ...f, minutes: e.target.value })} />
+              </div>
+            </Field>
+            <Field label="Remarks" error={errors.remarks} hint="Optional, for example: from the DTR">
+              <input type="text" value={f.remarks} onChange={(e) => setF({ ...f, remarks: e.target.value })} maxLength={200} />
+            </Field>
+          </div>
+          <button className="btn primary" type="submit" style={{ marginBottom: 16 }} disabled={!total}>
+            <Plus size={16} aria-hidden />
+            Record late and undertime
+          </button>
+        </form>
+      )}
+      {list.data ? (
+        list.data.length === 0 ? (
+          <p className="small muted">None recorded.</p>
+        ) : (
+          <div className="card table-wrap">
+            <table className="grid">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th className="num">Late and undertime</th>
+                  <th className="num">VL deducted</th>
+                  <th>Remarks</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {list.data.map((x) => (
+                  <tr key={x.entryId}>
+                    <td className="small">{monthLabel(x.month)}</td>
+                    <td className="num">{hm(x.minutes)}</td>
+                    <td className="num">{x.days}</td>
+                    <td className="small">{x.remarks}</td>
+                    <td>
+                      {props.canEdit && (
+                        <button
+                          className="btn"
+                          aria-label="Remove this entry"
+                          onClick={async () => {
+                            try {
+                              list.setData(await api('api_deleteTardiness', { entryId: x.entryId }));
                               await props.onChanged();
                             } catch (e2) {
                               setErr(errorText(e2));

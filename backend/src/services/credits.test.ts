@@ -232,3 +232,56 @@ describe('HR adds and deducts CTO', () => {
     expect(err(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-20', hours: 8, reference: 'x' })).code).toBe('FORBIDDEN');
   });
 });
+
+describe('work schedules, half days and late deductions', () => {
+  const setSchedule = (deps: Deps, email: string, workSchedule: 'STANDARD' | 'COMPRESSED') => {
+    as(deps, PEOPLE.hr);
+    const p = ok(endpoints.api_listEmployees(deps, {})).find((e) => e.email === email)!;
+    ok(endpoints.api_saveEmployee(deps, { ...p, workSchedule }));
+  };
+  const vl = (deps: Deps) => {
+    as(deps, PEOPLE.staff);
+    return ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'VL')!;
+  };
+
+  it('takes 1.25 a day and 0.625 a half day on a compressed week, and skips Fridays', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_saveCredits(deps, { employeeId: deps.ids.staff, asOf: '2026-11-30', vlBalance: 10, slBalance: 10 }));
+    setSchedule(deps, PEOPLE.staff, 'COMPRESSED');
+    // Thu Dec 10 (half) and Fri Dec 11 (day off on a compressed week) and Mon Dec 14.
+    const app = ok(file(deps, PEOPLE.staff, 'VL', ['2026-12-10', '2026-12-11', '2026-12-14'], { location: 'PH', halfDays: ['2026-12-10'] } as never));
+    expect(app.workingDays).toBe(1.5);
+    expect(vl(deps).onHold).toBe(1.875);
+    // On an 8-hour schedule the same days count as they are, Friday included.
+    const deps2 = seededDeps();
+    const app2 = ok(file(deps2, PEOPLE.staff, 'VL', ['2026-12-10', '2026-12-11', '2026-12-14'], { location: 'PH', halfDays: ['2026-12-10'] } as never));
+    expect(app2.workingDays).toBe(2.5);
+    as(deps2, PEOPLE.staff);
+    expect(ok(endpoints.api_myCredits(deps2, {})).lines.find((l) => l.code === 'VL')!.onHold).toBe(2.5);
+  });
+
+  it('refuses a half day that is not one of the working days picked', () => {
+    const deps = seededDeps();
+    setSchedule(deps, PEOPLE.staff, 'COMPRESSED');
+    expect(err(file(deps, PEOPLE.staff, 'VL', ['2026-12-11', '2026-12-14'], { location: 'PH', halfDays: ['2026-12-11'] } as never)).message).toContain('half day');
+  });
+
+  it('deducts recorded late and undertime from VL at hours / 8 + minutes / 480', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_saveCredits(deps, { employeeId: deps.ids.staff, asOf: '2026-09-30', vlBalance: 10, slBalance: 10 }));
+    const before = vl(deps).used;
+    as(deps, PEOPLE.hr);
+    // 1 hour 44 minutes = 104 minutes, as in the calculator: 104 / 480 = 0.217 day.
+    const rows = ok(endpoints.api_saveTardiness(deps, { employeeId: deps.ids.staff, month: '2026-10', minutes: 104, remarks: 'DTR' }));
+    expect(rows[0]!.days).toBe(0.217);
+    // A month before the leave card date is already in the balance and is not taken again.
+    ok(endpoints.api_saveTardiness(deps, { employeeId: deps.ids.staff, month: '2026-09', minutes: 36 }));
+    expect(vl(deps).used).toBe(before + 0.217);
+    as(deps, PEOPLE.ao);
+    expect(err(endpoints.api_saveTardiness(deps, { employeeId: deps.ids.staff, month: '2026-10', minutes: 10 })).code).toBe('FORBIDDEN');
+    as(deps, PEOPLE.hr);
+    expect(err(endpoints.api_saveTardiness(deps, { employeeId: deps.ids.cos, month: '2026-10', minutes: 10 })).message).toContain('COS');
+  });
+});

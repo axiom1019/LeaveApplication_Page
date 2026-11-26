@@ -1,5 +1,5 @@
 /* Rows ↔ typed records. All sheet access in services goes through here or db directly. */
-import { GOVMAIL_DOMAIN, ROLES, type ApplicationStatus, type EmploymentType, type LeaveCreditsMode, type Role, type Section, type SignMethod, type Signatory } from '@shared/constants';
+import { GOVMAIL_DOMAIN, ROLES, type ApplicationStatus, type EmploymentType, type WorkSchedule, type LeaveCreditsMode, type Role, type Section, type SignMethod, type Signatory } from '@shared/constants';
 import type { EmployeeDto, SettingsDto } from '@shared/api';
 import type { LeaveDetails } from '@shared/schemas';
 import type { LeaveTypeCode } from '@shared/leaveTypes';
@@ -19,6 +19,7 @@ export interface Employee {
   employmentType: EmploymentType;
   /** HR marked this person a solo parent: 7 days of solo parent leave a year (RA 8972). */
   soloParent: boolean;
+  workSchedule: WorkSchedule;
   roles: Role[];
   signatureFileId: string;
   isActive: boolean;
@@ -44,6 +45,7 @@ export function toEmployee(r: RowOf<'Employees'>): Employee {
     salary: r.salary,
     employmentType: (r.employment_type as EmploymentType) || 'REGULAR',
     soloParent: bool(r.solo_parent ?? ''),
+    workSchedule: r.work_schedule === 'COMPRESSED' ? 'COMPRESSED' : 'STANDARD',
     roles: r.roles.split(',').map((s) => s.trim()).filter((s): s is Role => (ROLES as readonly string[]).includes(s)),
     signatureFileId: r.signature_file_id,
     isActive: bool(r.is_active),
@@ -65,6 +67,7 @@ export function employeeRow(e: Employee): RowOf<'Employees'> {
     salary: e.salary,
     employment_type: e.employmentType,
     solo_parent: boolCell(e.soloParent),
+    work_schedule: e.workSchedule,
     roles: e.roles.join(','),
     signature_file_id: e.signatureFileId,
     is_active: boolCell(e.isActive),
@@ -121,7 +124,10 @@ export interface Application {
   leaveTypeOther: string;
   details: LeaveDetails;
   dates: string[];
+  /** Working days applied for; half days count 0.5. */
   workingDays: number;
+  /** Days of VL/SL credit the leave takes: working days x hours of the person's workday / 8 (1.25 on a compressed week). */
+  creditDays: number;
   commutation: 'REQUESTED' | 'NOT_REQUESTED';
   /** The signatory order in force when the application was filed (later setting changes don't move it). */
   flow: FlowStep[];
@@ -163,7 +169,8 @@ export function toApplication(r: RowOf<'Applications'>): Application {
     leaveTypeOther: r.leave_type_other,
     details: json<LeaveDetails>(r.details_json, {}),
     dates: json<string[]>(r.dates_json, []),
-    workingDays: int(r.working_days),
+    workingDays: Number(r.working_days) || 0,
+    creditDays: r.credit_days ? Number(r.credit_days) || 0 : Number(r.working_days) || 0,
     commutation: r.commutation === 'REQUESTED' ? 'REQUESTED' : 'NOT_REQUESTED',
     flow: json<FlowStep[]>(r.flow_json, []),
     currentStep: int(r.current_step),
@@ -197,6 +204,7 @@ export function applicationRow(a: Application): RowOf<'Applications'> {
     details_json: JSON.stringify(a.details),
     dates_json: JSON.stringify(a.dates),
     working_days: String(a.workingDays),
+    credit_days: String(a.creditDays),
     commutation: a.commutation,
     flow_json: JSON.stringify(a.flow),
     current_step: String(a.currentStep),
@@ -366,6 +374,7 @@ export function employeeDto(e: Employee, divisions: Map<string, Division>): Empl
     salary: e.salary,
     employmentType: e.employmentType,
     soloParent: e.soloParent,
+    workSchedule: e.workSchedule,
     roles: e.roles,
     isActive: e.isActive,
     hasSignature: !!e.signatureFileId,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { DivisionDto, EmployeeDto } from '@shared/api';
-import { ROLES, ROLE_LABELS, type Role } from '@shared/constants';
+import { ROLES, ROLE_LABELS, WORK_SCHEDULES, WORK_SCHEDULE_INFO, type Role, type WorkSchedule } from '@shared/constants';
 import { api, errorText, fieldErrors } from '../api/client';
 import { Field, Loading, Modal, useLoad, useToast } from '../components/ui';
 import { useSession } from '../session';
@@ -97,6 +97,7 @@ function EmployeeForm(props: { person: EmployeeDto | null; divisions: DivisionDt
     salary: p?.salary ?? '',
     employmentType: p?.employmentType ?? 'REGULAR',
     soloParent: p?.soloParent ?? false,
+    workSchedule: p?.workSchedule ?? 'STANDARD',
     roles: p?.roles ?? ([] as Role[]),
     isActive: p?.isActive ?? true,
   });
@@ -168,6 +169,15 @@ function EmployeeForm(props: { person: EmployeeDto | null; divisions: DivisionDt
         </Field>
         {text('position', 'Position')}
         {text('salary', 'Salary', 'As printed on item 5 of the form')}
+        <Field label="Work schedule" error={errors.workSchedule} hint="Compressed: a leave day takes 1.25 days of VL/SL credit, a half day 0.625.">
+          <select value={f.workSchedule} onChange={(e) => set({ workSchedule: e.target.value as WorkSchedule })}>
+            {WORK_SCHEDULES.map((w) => (
+              <option key={w} value={w}>
+                {WORK_SCHEDULE_INFO[w].label}
+              </option>
+            ))}
+          </select>
+        </Field>
       </div>
       {f.employmentType === 'REGULAR' && (
         <label className="choice" style={{ marginBottom: 14 }}>

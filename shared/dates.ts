@@ -41,9 +41,16 @@ export function normalizeDates(dates: readonly string[]): string[] {
   return [...new Set(dates)].sort();
 }
 
-/** Working days among the chosen dates: weekends and listed holidays are left out. */
-export function countWorkingDays(dates: readonly string[], holidays: ReadonlySet<string>): number {
-  return normalizeDates(dates).filter((d) => !isWeekend(d) && !holidays.has(d)).length;
+/** Working days among the chosen dates: days off (weekends, or Fridays on a compressed week) and holidays are left out. */
+export function workingDates(dates: readonly string[], holidays: ReadonlySet<string>, weekdays: readonly number[] = [1, 2, 3, 4, 5]): string[] {
+  return normalizeDates(dates).filter((d) => weekdays.includes(weekday(d)) && !holidays.has(d));
+}
+
+/** Working days among the chosen dates, counting each half day as 0.5. */
+export function countWorkingDays(dates: readonly string[], holidays: ReadonlySet<string>, weekdays?: readonly number[], halfDays: readonly string[] = []): number {
+  const work = workingDates(dates, holidays, weekdays);
+  const half = new Set(halfDays);
+  return work.reduce((n, d) => n + (half.has(d) ? 0.5 : 1), 0);
 }
 
 /** Every calendar day from start to end inclusive. */

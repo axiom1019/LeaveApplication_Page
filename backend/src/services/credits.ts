@@ -88,6 +88,27 @@ function cocRemaining(entries: CocEntry[], approvedCto: Application[]): Map<stri
 const deductedHours = (entries: CocEntry[]) => entries.filter((e) => e.hours < 0).reduce((n, e) => n - e.hours, 0);
 
 const days = (apps: Application[]) => apps.reduce((n, a) => n + a.workingDays, 0);
+/** VL/SL credit taken: working days x workday hours / 8 (1.25 a day on a compressed week). */
+const creditDays = (apps: Application[]) => apps.reduce((n, a) => n + a.creditDays, 0);
+
+export interface TardinessEntry {
+  entryId: string;
+  employeeId: string;
+  month: string;
+  minutes: number;
+  remarks: string;
+}
+
+function tardinessEntries(db: Db, employeeId: string): TardinessEntry[] {
+  return db
+    .readAll('Tardiness')
+    .filter((r) => r.employee_id === employeeId && !r.deleted_at)
+    .map((r) => ({ entryId: r.entry_id, employeeId: r.employee_id, month: r.month, minutes: Number(r.minutes) || 0, remarks: r.remarks }))
+    .sort((a, b) => b.month.localeCompare(a.month) || a.entryId.localeCompare(b.entryId));
+}
+
+/** Late and undertime in days of VL: hours / 8 + minutes / 8 / 60 (the office's calculator, CSC MC No. 16, s. 2010). */
+export const tardinessDays = (minutes: number) => round(minutes / 60 / 8);
 /** Hours of COC a CTO application uses: the hours the applicant chose, or whole days for older ones. */
 export const ctoHours = (a: Application) => a.details.hours ?? a.workingDays * CREDIT_RULES.hoursPerDay;
 const hoursOf = (apps: Application[]) => apps.reduce((n, a) => n + ctoHours(a), 0);
@@ -128,11 +149,15 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
     const months = asOf ? monthsBetween(asOf, today) : 0;
     const after = (a: Application) => !asOf || (a.dates[0] ?? '') > asOf;
     const noRecord = 'HR has not entered the balance from the leave card yet';
+    // Late and undertime HR recorded for months after the leave card date come off VL.
+    const asOfMonth = asOf.slice(0, 7);
+    const lateDays = round(tardinessEntries(db, e.employeeId).filter((t) => !asOf || t.month > asOfMonth).reduce((n, t) => n + tardinessDays(t.minutes), 0));
+    const perDay = e.workSchedule === 'COMPRESSED' ? ' Compressed week: each leave day takes 1.25 (half day 0.625).' : '';
     const earning = (bal: number) => (asOf ? `${bal} as of ${formatLongDate(asOf)}, plus ${CREDIT_RULES.monthlyAccrual} a month (${months} month${months === 1 ? '' : 's'})` : noRecord);
     lines.push(
-      line('VL', 'Vacation Leave', asOf ? vlBalance + months * CREDIT_RULES.monthlyAccrual : 0, days(of(approved, 'VL', 'FL').filter(after)), days(of(held, 'VL', 'FL').filter(after)), `${earning(vlBalance)}. Includes forced leave.`),
-      line('SL', 'Sick Leave', asOf ? slBalance + months * CREDIT_RULES.monthlyAccrual : 0, days(of(approved, 'SL').filter(after)), days(of(held, 'SL').filter(after)), earning(slBalance)),
-      line('FL', 'Mandatory/Forced Leave', CREDIT_RULES.forcedLeaveDays, days(of(approved, 'FL').filter(inYear)), days(of(held, 'FL').filter(inYear)), `${CREDIT_RULES.forcedLeaveDays} days to take in ${year}, taken from vacation leave`),
+      line('VL', 'Vacation Leave', asOf ? vlBalance + months * CREDIT_RULES.monthlyAccrual : 0, creditDays(of(approved, 'VL', 'FL').filter(after)) + lateDays, creditDays(of(held, 'VL', 'FL').filter(after)), `${earning(vlBalance)}. Includes forced leave${lateDays ? ` and ${lateDays} day${lateDays === 1 ? '' : 's'} for late and undertime` : ''}.${perDay}`),
+      line('SL', 'Sick Leave', asOf ? slBalance + months * CREDIT_RULES.monthlyAccrual : 0, creditDays(of(approved, 'SL').filter(after)), creditDays(of(held, 'SL').filter(after)), `${earning(slBalance)}.${perDay}`),
+      line('FL', 'Mandatory/Forced Leave', CREDIT_RULES.forcedLeaveDays, creditDays(of(approved, 'FL').filter(inYear)), creditDays(of(held, 'FL').filter(inYear)), `${CREDIT_RULES.forcedLeaveDays} days to take in ${year}, taken from vacation leave`),
       line('SPL', 'Special Privilege Leave', CREDIT_RULES.splDays, days(of(approved, 'SPL').filter(inYear)), days(of(held, 'SPL').filter(inYear)), `${CREDIT_RULES.splDays} days for ${year}, not carried over`),
     );
     if (e.soloParent) {
@@ -252,4 +277,49 @@ export function deleteCoc(deps: Deps, c: Caller, entryId: string): CocDto[] {
     return r.employee_id;
   });
   return listCoc(deps, c, employeeId);
+}
+
+// ---------------------------------------------------------------- late and undertime
+
+export function listTardiness(deps: Deps, c: Caller, employeeId: string): (TardinessEntry & { days: number })[] {
+  canView(c);
+  return tardinessEntries(deps.db.get(), employeeId).map((t) => ({ ...t, days: tardinessDays(t.minutes) }));
+}
+
+/** HR records a month's total late and undertime for a person; it is deducted from VL. */
+export function saveTardiness(deps: Deps, c: Caller, input: { employeeId: string; month: string; minutes: number; remarks?: string }) {
+  canManage(c);
+  deps.lock.run(() => {
+    const db = deps.db.get();
+    const e = db.findOne('Employees', 'employee_id', input.employeeId);
+    if (!e) throw new AppError('NOT_FOUND', 'Employee not found.');
+    if (toEmployee(e).employmentType === 'COS') throw new AppError('VALIDATION', 'Late and undertime are deducted from VL, which COS staff do not have.');
+    if (input.month > today(deps).slice(0, 7)) throw new AppError('VALIDATION', 'That month has not come yet.', { fields: { month: 'Choose this month or an earlier one' } });
+    const entryId = deps.uuid();
+    db.append('Tardiness', {
+      entry_id: entryId,
+      employee_id: input.employeeId,
+      month: input.month,
+      minutes: String(input.minutes),
+      remarks: input.remarks ?? '',
+      created_by: c.employee.employeeId,
+      created_at: new Date(deps.nowMs()).toISOString(),
+      deleted_at: '',
+    });
+    audit(deps, c.employee.employeeId, c.email, 'ADD_TARDINESS', input.employeeId, { entryId, ...input, days: tardinessDays(input.minutes) });
+  });
+  return listTardiness(deps, c, input.employeeId);
+}
+
+export function deleteTardiness(deps: Deps, c: Caller, entryId: string) {
+  canManage(c);
+  const employeeId = deps.lock.run(() => {
+    const db = deps.db.get();
+    const r = db.findOne('Tardiness', 'entry_id', entryId);
+    if (!r || r.deleted_at) throw new AppError('NOT_FOUND', 'Entry not found.');
+    db.replace('Tardiness', entryId, { ...r, deleted_at: new Date(deps.nowMs()).toISOString() });
+    audit(deps, c.employee.employeeId, c.email, 'DELETE_TARDINESS', r.employee_id, { entryId, month: r.month, minutes: r.minutes });
+    return r.employee_id;
+  });
+  return listTardiness(deps, c, employeeId);
 }

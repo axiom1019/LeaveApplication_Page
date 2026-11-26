@@ -208,8 +208,15 @@ class SheetsDb implements Db {
     let t = this.tables.get(name);
     if (!t) {
       t = new SheetTable(() => {
-        const sheet = this.ss.getSheetByName(name);
-        if (!sheet) throw new AppError('NOT_INITIALIZED', `Sheet "${name}" is missing. Run database setup again.`);
+        const existing = this.ss.getSheetByName(name);
+        if (existing) return existing;
+        // A table added in a later version: create its sheet with the header row, so the owner
+        // does not have to run database setup again.
+        const sheet = this.ss.insertSheet(name);
+        const cols = TABLES[name].columns as readonly string[];
+        sheet.getRange(1, 1, 1, cols.length).setNumberFormat('@').setValues([[...cols]]).setFontWeight('bold');
+        sheet.getRange(1, 1, sheet.getMaxRows(), cols.length).setNumberFormat('@');
+        sheet.setFrozenRows(1);
         return sheet;
       }, TABLES[name].id, TABLES[name].columns);
       this.tables.set(name, t);

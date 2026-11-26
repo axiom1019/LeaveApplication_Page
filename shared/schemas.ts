@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EMPLOYMENT_TYPES, LEAVE_CREDITS_MODES, ROLES, SECTIONS, SIGNATORIES, SIGN_METHODS } from './constants';
+import { WORK_SCHEDULES, EMPLOYMENT_TYPES, LEAVE_CREDITS_MODES, ROLES, SECTIONS, SIGNATORIES, SIGN_METHODS } from './constants';
 import { isValidIsoDate } from './dates';
 import { LEAVE_TYPE_CODES } from './leaveTypes';
 
@@ -27,7 +27,9 @@ export const leaveDetails = z.object({
   /** Wellness leave: "Purpose of Leave" on FORM-ASHRDD-031. */
   purpose: text(300).optional(),
   /** CTO: hours of COC to use (8 make a day). */
-  hours: z.number().positive().max(8 * 366).multipleOf(0.5).optional(),
+  hours: z.number().positive().max(10 * 366).multipleOf(0.5).optional(),
+  /** Dates among the inclusive dates taken as half days (counted as 0.5). */
+  halfDays: z.array(isoDate).max(366).optional(),
 });
 export type LeaveDetails = z.infer<typeof leaveDetails>;
 
@@ -111,6 +113,7 @@ export const saveEmployeeInput = z.object({
   salary: text(30).optional(),
   employmentType: z.enum(EMPLOYMENT_TYPES),
   soloParent: z.boolean().optional(),
+  workSchedule: z.enum(WORK_SCHEDULES).optional(),
   roles: z.array(z.enum(ROLES)).max(ROLES.length),
   isActive: z.boolean(),
 });
@@ -179,6 +182,14 @@ export const saveCocInput = z.object({
   kind: z.enum(['EARNED', 'DEDUCTED']).optional(),
 });
 export const deleteCocInput = z.object({ entryId: id });
+
+export const saveTardinessInput = z.object({
+  employeeId: id,
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Choose the month'),
+  minutes: z.number().int('Whole minutes').positive('Enter the late and undertime').max(60 * 200),
+  remarks: text(200).optional(),
+});
+export const deleteTardinessInput = z.object({ entryId: id });
 
 export const uploadSignatureInput = z.object({
   /** PNG data, base64 without the data: prefix. About 300 KB at most after the browser resizes it. */

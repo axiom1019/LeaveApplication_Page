@@ -7,7 +7,7 @@ export const TABLES = {
     id: 'employee_id',
     columns: [
       'employee_id', 'email', 'last_name', 'first_name', 'middle_name', 'division_id', 'position', 'salary',
-      'employment_type', 'roles', 'signature_file_id', 'is_active', 'created_at', 'updated_at', 'version', 'solo_parent',
+      'employment_type', 'roles', 'signature_file_id', 'is_active', 'created_at', 'updated_at', 'version', 'solo_parent', 'work_schedule',
     ],
   },
   Divisions: { id: 'division_id', columns: ['division_id', 'code', 'name', 'chief_employee_id', 'no_chief', 'is_active'] },
@@ -15,7 +15,7 @@ export const TABLES = {
     id: 'application_id',
     columns: [
       'application_id', 'applicant_id', 'filed_on', 'filed_at', 'office', 'division_id', 'last_name', 'first_name', 'middle_name',
-      'position', 'salary', 'leave_type', 'leave_type_other', 'details_json', 'dates_json', 'working_days', 'commutation',
+      'position', 'salary', 'leave_type', 'leave_type_other', 'details_json', 'dates_json', 'working_days', 'commutation', 'credit_days',
       'flow_json', 'current_step', 'status', 'hr_remarks', 'filed_by', 'closed_at', 'cancel_reason', 'pdf_file_id',
       'idempotency_key', 'updated_at', 'version',
     ],
@@ -36,6 +36,11 @@ export const TABLES = {
   CocEntries: {
     id: 'entry_id',
     columns: ['entry_id', 'employee_id', 'earned_on', 'hours', 'reference', 'created_by', 'created_at', 'deleted_at'],
+  },
+  /** Tardiness and undertime HR records per month, deducted from VL (CSC MC No. 16, s. 2010). */
+  Tardiness: {
+    id: 'entry_id',
+    columns: ['entry_id', 'employee_id', 'month', 'minutes', 'remarks', 'created_by', 'created_at', 'deleted_at'],
   },
   Settings: { id: 'key', columns: ['key', 'value', 'updated_by', 'updated_at'] },
   AuditLog: { id: 'log_id', columns: ['log_id', 'at', 'actor_id', 'actor_email', 'action', 'entity_id', 'detail_json'] },

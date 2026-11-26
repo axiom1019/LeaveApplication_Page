@@ -53,6 +53,7 @@ export function initializeDatabase(deps: Deps): { url: string; created: boolean 
           salary: '',
           employmentType: 'REGULAR',
           soloParent: false,
+          workSchedule: 'STANDARD',
           roles: ['ADMIN', 'HR'],
           signatureFileId: '',
           isActive: true,

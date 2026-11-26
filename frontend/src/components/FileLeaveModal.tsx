@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ApplicationDetail } from '@shared/api';
-import { ROLE_LABELS } from '@shared/constants';
-import { countWorkingDays, formatInclusiveDates, formatLongDate } from '@shared/dates';
+import { ROLE_LABELS, WORK_SCHEDULE_INFO, creditPerDay } from '@shared/constants';
+import { countWorkingDays, formatInclusiveDates, formatLongDate, workingDates } from '@shared/dates';
 import { leaveTypesFor, LOCATION_CHOICES, OTHER_PURPOSE_CHOICES, SICK_CHOICES, STUDY_CHOICES, leaveType, type LeaveTypeCode } from '@shared/leaveTypes';
 import { leaveForm, type LeaveDetails } from '@shared/schemas';
 import { api, errorText, fieldErrors, newKey } from '../api/client';
@@ -29,13 +29,21 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
   const creditLines = (credits.data?.lines ?? []).filter((l) => l.code === type || (type === 'FL' && l.code === 'VL'));
 
   const holidays = useMemo(() => new Map(boot.holidays.map((h) => [h.date, h.name])), [boot.holidays]);
-  const working = countWorkingDays(dates, new Set(holidays.keys()));
+  const sched = WORK_SCHEDULE_INFO[e.workSchedule];
+  const holidaySet = useMemo(() => new Set(holidays.keys()), [holidays]);
+  const workDates = workingDates(dates, holidaySet, sched.weekdays);
+  const halfDays = (details.halfDays ?? []).filter((d) => workDates.includes(d));
+  const working = countWorkingDays(dates, holidaySet, sched.weekdays, halfDays);
+  const perDay = creditPerDay(e.workSchedule);
+  // VL, SL and forced leave are counted in 8-hour days: a compressed-week day takes 1.25.
+  const creditTaken = type === 'VL' || type === 'SL' || type === 'FL' ? Math.round(working * perDay * 1000) / 1000 : null;
+  const toggleHalf = (d: string) => set({ halfDays: halfDays.includes(d) ? halfDays.filter((x) => x !== d) : [...halfDays, d].sort() });
   const kind = type ? leaveType(type).details : 'NONE';
   const set = (patch: Partial<LeaveDetails>) => setDetails((d) => ({ ...d, ...patch }));
 
   const submit = async () => {
     setFormError('');
-    const form = { leaveType: type as LeaveTypeCode, leaveTypeOther: other || undefined, details, dates, commutation };
+    const form = { leaveType: type as LeaveTypeCode, leaveTypeOther: other || undefined, details: { ...details, halfDays: halfDays.length ? halfDays : undefined }, dates, commutation };
     const local = leaveForm.safeParse(form);
     const errs: Record<string, string> = {};
     if (!type) errs.leaveType = 'Choose the type of leave';
@@ -198,8 +206,8 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
               error={errors['details.hours']}
               hint={
                 working
-                  ? `8 hours make a day: up to ${working * 8} hours for the ${working} working day${working === 1 ? '' : 's'} you picked. For a half day, enter 4.`
-                  : '8 hours make a day. Pick the dates below; for a half day, enter 4.'
+                  ? `Your workday is ${sched.hours} hours: up to ${working * sched.hours} hours for the ${working} working day${working === 1 ? '' : 's'} you picked. For a half day, enter ${sched.hours / 2}.`
+                  : `Your workday is ${sched.hours} hours. Pick the dates below; for a half day, enter ${sched.hours / 2}.`
               }
             >
               <input
@@ -234,18 +242,39 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
       <div className="section-title" style={{ marginTop: 18 }}>
         6.C Inclusive dates
       </div>
-      <DatePicker value={dates} onChange={setDates} holidays={holidays} today={boot.today} />
+      <DatePicker value={dates} onChange={setDates} holidays={holidays} today={boot.today} weekdays={sched.weekdays} />
       <div className="days-summary" aria-live="polite">
         {dates.length ? (
           <>
             <b>{working}</b> working day{working === 1 ? '' : 's'} applied for · {formatInclusiveDates(dates)}
-            {dates.length !== working && <div className="small muted">Weekends and holidays you picked are not counted.</div>}
+            {creditTaken !== null && perDay !== 1 && (
+              <div className="small">
+                Takes <b>{creditTaken}</b> days of leave credit: on your compressed week a day counts as 1.25 and a half day as 0.625.
+              </div>
+            )}
+            {workDates.length !== dates.length && <div className="small muted">Days off and holidays you picked are not counted.</div>}
           </>
         ) : (
           'No dates picked yet.'
         )}
       </div>
       {errors.dates && <div className="err small" style={{ color: 'var(--red)', marginTop: 4 }}>{errors.dates}</div>}
+      {workDates.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div className="small" style={{ fontWeight: 500, marginBottom: 6 }}>
+            Half days <span className="muted">(tick a day you take only half of)</span>
+          </div>
+          <div className="type-grid">
+            {workDates.map((d) => (
+              <label key={d} className="choice">
+                <input type="checkbox" checked={halfDays.includes(d)} onChange={() => toggleHalf(d)} />
+                <span>{formatLongDate(d)}: half day</span>
+              </label>
+            ))}
+          </div>
+          {errors['details.halfDays'] && <div className="err small" style={{ color: 'var(--red)' }}>{errors['details.halfDays']}</div>}
+        </div>
+      )}
 
       <div className="section-title" style={{ marginTop: 18 }}>
         6.D Commutation
