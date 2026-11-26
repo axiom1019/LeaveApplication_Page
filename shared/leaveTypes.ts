@@ -17,7 +17,7 @@ export const LEAVE_TYPES = [
   // Contract of service workers are not covered by the CSC leave rules. DHSUD Region 10 gives them
   // these two. CTO prints under 6.A "Others" on CSC Form No. 6; Wellness Leave prints on the
   // region's own form, FORM-ASHRDD-031 (see backend/src/services/wellnessForm.ts).
-  { code: 'CTO', label: 'Compensatory Time-Off (CTO)', basis: '', details: 'HOURS', for: 'COS' },
+  { code: 'CTO', label: 'Compensatory Time-Off (CTO)', basis: '', details: 'HOURS', for: 'ALL' },
   { code: 'WELLNESS', label: 'Wellness Leave', basis: '', details: 'PURPOSE', for: 'COS' },
 ] as const;
 
@@ -28,11 +28,13 @@ export const LEAVE_TYPE_CODES = LEAVE_TYPES.map((t) => t.code) as [LeaveTypeCode
 export type EligibleFor = (typeof LEAVE_TYPES)[number]['for'];
 
 /**
- * The leave types a person may file: CSC leave for regular staff, CTO and Wellness for COS.
+ * The leave types a person may file: CSC leave for regular staff, Wellness for COS, CTO for both
+ * (anyone can earn COC).
  * Solo parent leave only for those HR marked as solo parents.
  */
 export function leaveTypesFor(e: { employmentType: string; soloParent?: boolean }) {
-  return LEAVE_TYPES.filter((t) => t.for === (e.employmentType === 'COS' ? 'COS' : 'REGULAR') && (t.code !== 'SOLO' || !!e.soloParent));
+  const group = e.employmentType === 'COS' ? 'COS' : 'REGULAR';
+  return LEAVE_TYPES.filter((t) => (t.for === group || t.for === 'ALL') && (t.code !== 'SOLO' || !!e.soloParent));
 }
 
 /** Leave printed under 6.A "Others" on CSC Form No. 6, with this text written in. */

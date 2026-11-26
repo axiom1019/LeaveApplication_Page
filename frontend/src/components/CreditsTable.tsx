@@ -40,5 +40,5 @@ export function CreditsTable({ credits }: { credits: CreditsDto }) {
 
 export function creditsCaption(c: CreditsDto): string {
   if (c.employmentType === 'COS') return 'CTO comes from the overtime credits (COC) HR records. Wellness leave is 5 days a year.';
-  return c.asOf ? `From the leave card balance as of ${formatLongDate(c.asOf)}, plus monthly earnings, less approved leave.` : 'HR has not entered your balance from the leave card yet.';
+  return `${c.asOf ? `From the leave card balance as of ${formatLongDate(c.asOf)}, plus monthly earnings, less approved leave.` : 'HR has not entered your balance from the leave card yet.'} CTO comes from the overtime credits (COC) HR records.`;
 }

@@ -44,14 +44,25 @@ describe('leave credits', () => {
     expect(addMonths('2025-12-05', 12)).toBe('2026-12-05');
   });
 
-  it('gives COS staff only CTO and Wellness Leave, and regular staff not those', () => {
+  it('gives COS staff only CTO and Wellness Leave, and regular staff CTO but not wellness', () => {
     const deps = seededDeps();
     expect(err(file(deps, PEOPLE.cos, 'VL', ['2026-12-07'], { location: 'PH' })).message).toContain('CTO or Wellness');
     expect(err(file(deps, PEOPLE.staff, 'WELLNESS', ['2026-12-07'])).message).toContain('contract of service');
     as(deps, PEOPLE.cos);
     expect(ok(endpoints.api_myCredits(deps, {})).lines.map((l) => l.code)).toEqual(['CTO', 'WELLNESS']);
     as(deps, PEOPLE.staff);
-    expect(ok(endpoints.api_myCredits(deps, {})).lines.map((l) => l.code)).toEqual(['VL', 'SL', 'FL', 'SPL']);
+    expect(ok(endpoints.api_myCredits(deps, {})).lines.map((l) => l.code)).toEqual(['VL', 'SL', 'FL', 'SPL', 'CTO']);
+  });
+
+  it('lets regular staff earn COC and file CTO in hours', () => {
+    const deps = seededDeps();
+    expect(err(file(deps, PEOPLE.staff, 'CTO', ['2026-12-07'], { hours: 4 })).message).toContain('0 hours of Compensatory Time-Off');
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_saveCoc(deps, { employeeId: deps.ids.staff, earnedOn: '2026-11-02', hours: 8, reference: 'OT-R1' }));
+    const app = ok(file(deps, PEOPLE.staff, 'CTO', ['2026-12-07'], { hours: 4 }));
+    as(deps, PEOPLE.staff);
+    expect(ok(endpoints.api_formHtml(deps, { applicationId: app.applicationId })).html).toContain('Compensatory Time-Off (CTO), 4 hours');
+    expect(ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'CTO')!.available).toBe(0.5);
   });
 
   it('allows 5 days of wellness leave a year, counting leave on hold', () => {

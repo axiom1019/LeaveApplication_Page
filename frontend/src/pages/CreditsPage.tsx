@@ -26,7 +26,7 @@ export function CreditsPage() {
           <h1>Leave credits</h1>
           <p>
             Available leave for every staff member, in working days. Enter each regular employee's balance from the leave card once; the app adds 1.25 days of
-            VL and SL a month and deducts approved leave. For COS staff, record their approved COCs.
+            VL and SL a month and deducts approved leave. Record approved COCs (overtime) for anyone, regular or COS, to give them CTO.
           </p>
         </div>
       </div>
@@ -47,6 +47,7 @@ export function CreditsPage() {
                   <th className="num">Sick</th>
                   <th className="num">Forced</th>
                   <th className="num">Special privilege</th>
+                  <th className="num">CTO</th>
                   <th>Leave card as of</th>
                   <th />
                 </tr>
@@ -62,6 +63,7 @@ export function CreditsPage() {
                     <td className="num">{c.asOf ? cell(avail(c, 'SL')) : <span className="muted">—</span>}</td>
                     <td className="num">{cell(avail(c, 'FL'))}</td>
                     <td className="num">{cell(avail(c, 'SPL'))}</td>
+                    <td className="num">{cell(avail(c, 'CTO'))}</td>
                     <td className="small">{c.asOf ? formatLongDate(c.asOf) : <span className="badge-warn">Not entered</span>}</td>
                     <td>
                       <button className="btn" onClick={() => setOpen(c)}>
@@ -152,13 +154,11 @@ function CreditsDialog(props: { credits: CreditsDto; onClose: () => void; onChan
       <p className="small muted" style={{ marginTop: -8, marginBottom: 20 }}>
         {creditsCaption(c)}
       </p>
-      {c.employmentType === 'COS' ? (
+      {c.employmentType !== 'COS' &&
+        (canEdit ? <BalanceForm credits={c} onSaved={refresh} /> : <p className="small muted">Only HR and the administrator can change balances.</p>)}
+      <div style={{ marginTop: c.employmentType === 'COS' ? 0 : 24 }}>
         <CocLedger employeeId={c.employeeId} onChanged={refresh} canEdit={canEdit} />
-      ) : canEdit ? (
-        <BalanceForm credits={c} onSaved={refresh} />
-      ) : (
-        <p className="small muted">Only HR and the administrator can change balances.</p>
-      )}
+      </div>
     </Modal>
   );
 }

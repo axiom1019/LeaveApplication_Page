@@ -272,7 +272,7 @@ function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], wor
         ? 'Contract of service staff can file CTO or Wellness Leave only.'
         : code === 'SOLO'
           ? 'Solo parent leave is for staff HR has marked as solo parents.'
-          : 'CTO and Wellness Leave are for contract of service staff.';
+          : 'Wellness Leave is for contract of service staff.';
     throw new AppError('VALIDATION', msg, { fields: { leaveType: msg } });
   }
   if (code === 'CTO' && hours !== undefined && hours > workingDays * CREDIT_RULES.hoursPerDay) {

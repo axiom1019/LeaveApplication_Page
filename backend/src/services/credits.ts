@@ -4,8 +4,8 @@
  * Regular staff: HR enters the VL and SL balance from the leave card with an "as of" date. The
  * app adds 1.25 days of each for every month since, and deducts approved leave dated after it.
  * Forced leave (taken from VL) and special privilege leave have yearly allowances.
- * COS staff: CTO from the COCs HR records (hours, 8 to a day, lapsing after a year, oldest used
- * first) and 5 days of wellness leave a year.
+ * Everyone: CTO from the COCs HR records (hours, 8 to a day, lapsing after a year, oldest used
+ * first). COS staff also get 5 days of wellness leave a year.
  * Leave that is filed but not yet decided is shown "on hold" and already counts against what is
  * available, so nobody files the same days twice.
  */
@@ -110,15 +110,18 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
   const slBalance = Number(row?.sl_balance) || 0;
   const lines: CreditLine[] = [];
 
+  // CTO: anyone can earn COC, regular and COS staff alike.
+  const entries = cocEntries(db, e.employeeId);
+  const left = cocRemaining(entries, of(approved, 'CTO'));
+  const liveHours = entries.filter((x) => x.hours > 0 && addMonths(x.earnedOn, CREDIT_RULES.cocLapseMonths) > today).reduce((n, x) => n + (left.get(x.entryId) ?? 0), 0);
+  const usedHours = hoursOf(of(approved, 'CTO')) + deductedHours(entries);
+  const h = CREDIT_RULES.hoursPerDay;
+  // "Earned" is what is still usable plus what was used, so earned − used = unexpired COC left.
+  const ctoLine = line('CTO', 'Compensatory Time-Off (CTO)', (liveHours + usedHours) / h, usedHours / h, hoursOf(of(held, 'CTO')) / h, `${round(liveHours)} hours of unexpired COC left (${h} hours = 1 day). COCs lapse ${CREDIT_RULES.cocLapseMonths} months after they are earned.`);
+
   if (e.employmentType === 'COS') {
-    const entries = cocEntries(db, e.employeeId);
-    const left = cocRemaining(entries, of(approved, 'CTO'));
-    const liveHours = entries.filter((x) => x.hours > 0 && addMonths(x.earnedOn, CREDIT_RULES.cocLapseMonths) > today).reduce((n, x) => n + (left.get(x.entryId) ?? 0), 0);
-    const usedHours = hoursOf(of(approved, 'CTO')) + deductedHours(entries);
-    const h = CREDIT_RULES.hoursPerDay;
-    // "Earned" is what is still usable plus what was used, so earned − used = unexpired COC left.
     lines.push(
-      line('CTO', 'Compensatory Time-Off (CTO)', (liveHours + usedHours) / h, usedHours / h, hoursOf(of(held, 'CTO')) / h, `${round(liveHours)} hours of unexpired COC left (${h} hours = 1 day). COCs lapse ${CREDIT_RULES.cocLapseMonths} months after they are earned.`),
+      ctoLine,
       line('WELLNESS', 'Wellness Leave', CREDIT_RULES.wellnessDays, days(of(approved, 'WELLNESS').filter(inYear)), days(of(held, 'WELLNESS').filter(inYear)), `${CREDIT_RULES.wellnessDays} days for ${year}, not carried over`),
     );
   } else {
@@ -135,6 +138,7 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
     if (e.soloParent) {
       lines.push(line('SOLO', 'Solo Parent Leave', CREDIT_RULES.soloParentDays, days(of(approved, 'SOLO').filter(inYear)), days(of(held, 'SOLO').filter(inYear)), `${CREDIT_RULES.soloParentDays} days for ${year} (RA 8972), not carried over`));
     }
+    lines.push(ctoLine);
   }
   return {
     employeeId: e.employeeId,
