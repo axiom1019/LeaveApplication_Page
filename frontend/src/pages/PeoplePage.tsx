@@ -96,6 +96,7 @@ function EmployeeForm(props: { person: EmployeeDto | null; divisions: DivisionDt
     position: p?.position ?? '',
     salary: p?.salary ?? '',
     employmentType: p?.employmentType ?? 'REGULAR',
+    soloParent: p?.soloParent ?? false,
     roles: p?.roles ?? ([] as Role[]),
     isActive: p?.isActive ?? true,
   });
@@ -168,6 +169,15 @@ function EmployeeForm(props: { person: EmployeeDto | null; divisions: DivisionDt
         {text('position', 'Position')}
         {text('salary', 'Salary', 'As printed on item 5 of the form')}
       </div>
+      {f.employmentType === 'REGULAR' && (
+        <label className="choice" style={{ marginBottom: 14 }}>
+          <input type="checkbox" checked={f.soloParent} onChange={(e) => set({ soloParent: e.target.checked })} />
+          <span>
+            Solo parent
+            <small>Gets 7 days of solo parent leave a year (RA 8972). Tick only with a valid Solo Parent ID on file.</small>
+          </span>
+        </label>
+      )}
       <div className="section-title">Roles</div>
       <p className="small muted" style={{ marginBottom: 8 }}>
         Everyone can file their own leave. The Division Chief signs for the division they are set as chief of (Settings → Divisions).

@@ -1,7 +1,7 @@
 import type { ApplicationDetail, ApplicationSummary, SettingsDto, SignatureDto, StepDto } from '@shared/api';
 import { ROLE_LABELS, SECTION_LABELS, STATUS_LABELS, type Section } from '@shared/constants';
 import { countWorkingDays, formatInclusiveDates, manilaDate, manilaDateTime, normalizeDates } from '@shared/dates';
-import { leaveType, leaveTypesFor } from '@shared/leaveTypes';
+import { CREDIT_RULES, leaveType, leaveTypesFor } from '@shared/leaveTypes';
 import { creditsFor } from './credits';
 import type { LeaveForm, SignInput } from '@shared/schemas';
 import { int } from '../repository/cells';
@@ -264,21 +264,33 @@ export function filingBlock(ctx: Ctx, e: Employee): string {
 
 const CLOSED = new Set(['CANCELLED', 'DISAPPROVED']);
 
-/** Refuses leave types the person is not entitled to, and CTO, wellness or SPL beyond what is left. */
-function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], workingDays: number, all: Application[]) {
-  if (!leaveTypesFor(me.employmentType).some((t) => t.code === code)) {
-    const msg = me.employmentType === 'COS' ? 'Contract of service staff can file CTO or Wellness Leave only.' : 'CTO and Wellness Leave are for contract of service staff.';
+/** Refuses leave types the person is not entitled to, and CTO, wellness, SPL or solo parent leave beyond what is left. */
+function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], workingDays: number, all: Application[], hours?: number) {
+  if (!leaveTypesFor(me).some((t) => t.code === code)) {
+    const msg =
+      me.employmentType === 'COS'
+        ? 'Contract of service staff can file CTO or Wellness Leave only.'
+        : code === 'SOLO'
+          ? 'Solo parent leave is for staff HR has marked as solo parents.'
+          : 'CTO and Wellness Leave are for contract of service staff.';
     throw new AppError('VALIDATION', msg, { fields: { leaveType: msg } });
   }
-  if (code !== 'CTO' && code !== 'WELLNESS' && code !== 'SPL') return;
+  if (code === 'CTO' && hours !== undefined && hours > workingDays * CREDIT_RULES.hoursPerDay) {
+    const msg = `${hours} hours is more than the ${workingDays} working day${workingDays === 1 ? '' : 's'} you picked (${workingDays * CREDIT_RULES.hoursPerDay} hours).`;
+    throw new AppError('VALIDATION', msg, { fields: { 'details.hours': msg } });
+  }
+  if (!['CTO', 'WELLNESS', 'SPL', 'SOLO'].includes(code)) return;
   const leaveYear = (dates[0] ?? ctx.today).slice(0, 4);
   // Yearly allowances are counted for the year of the leave; CTO against COC unexpired today.
   const asOf = code === 'CTO' || leaveYear === ctx.today.slice(0, 4) ? ctx.today : `${leaveYear}-01-01`;
   const line = creditsFor(ctx.db, me, ctx.divisions, asOf, all).lines.find((l) => l.code === code);
-  if (line && workingDays > line.available) {
+  const need = code === 'CTO' ? (hours ?? workingDays * CREDIT_RULES.hoursPerDay) / CREDIT_RULES.hoursPerDay : workingDays;
+  if (line && need > line.available + 1e-9) {
     const left = Math.max(0, line.available);
-    const msg = `You have ${left} day${left === 1 ? '' : 's'} of ${line.label} left${line.onHold ? `, after ${line.onHold} on hold in other applications` : ''}. This application needs ${workingDays}.`;
-    throw new AppError('VALIDATION', msg, { fields: { dates: msg } });
+    const unit = code === 'CTO' ? `${Math.round(left * CREDIT_RULES.hoursPerDay * 100) / 100} hours` : `${left} day${left === 1 ? '' : 's'}`;
+    const asked = code === 'CTO' ? `${hours} hours` : `${workingDays}`;
+    const msg = `You have ${unit} of ${line.label} left${line.onHold ? `, after ${line.onHold} on hold in other applications` : ''}. This application needs ${asked}.`;
+    throw new AppError('VALIDATION', msg, { fields: { [code === 'CTO' ? 'details.hours' : 'dates']: msg } });
   }
 }
 
@@ -315,7 +327,7 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
     if (clash) {
       throw new AppError('CONFLICT', `You already have leave application ${clash.applicationId} covering some of these dates.`, { fields: { dates: 'Overlaps another application' } });
     }
-    checkCredits(ctx, me, form.leaveType, dates, workingDays, existing);
+    checkCredits(ctx, me, form.leaveType, dates, workingDays, existing, form.leaveType === 'CTO' ? form.details.hours : undefined);
 
     const year = ctx.today.slice(0, 4);
     const prefix = `LA-${year}-`;
@@ -331,6 +343,7 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
       STUDY: ['study'],
       OTHER: ['otherPurpose'],
       PURPOSE: ['purpose'],
+      HOURS: ['hours'],
       NONE: [],
     };
     for (const k of Object.keys(details) as (keyof typeof details)[]) if (!keep[kind]?.includes(k)) delete details[k];

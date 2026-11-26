@@ -16,7 +16,7 @@ function err<T>(r: ApiResult<T>) {
 const as = (deps: Deps, email: string) => deps.setActiveEmail(email);
 let n = 0;
 const key = () => `00000000-0000-4000-9000-${(++n).toString(16).padStart(12, '0')}`;
-const file = (deps: Deps, email: string, leaveType: string, dates: string[], details: Record<string, string> = leaveType === 'WELLNESS' ? { purpose: 'Rest and recovery' } : {}) => {
+const file = (deps: Deps, email: string, leaveType: string, dates: string[], details: Record<string, string | number> = leaveType === 'WELLNESS' ? { purpose: 'Rest and recovery' } : leaveType === 'CTO' ? { hours: dates.length * 8 } : {}) => {
   as(deps, email);
   return endpoints.api_fileLeave(deps, { idempotencyKey: key(), form: { leaveType, details, dates, commutation: 'NOT_REQUESTED' } });
 };
@@ -66,7 +66,7 @@ describe('leave credits', () => {
 
   it('builds CTO from recorded COC hours, uses them up, and lets them lapse after a year', () => {
     const deps = seededDeps();
-    expect(err(file(deps, PEOPLE.cos, 'CTO', ['2026-12-07'])).message).toContain('0 days of Compensatory Time-Off');
+    expect(err(file(deps, PEOPLE.cos, 'CTO', ['2026-12-07'])).message).toContain('0 hours of Compensatory Time-Off');
     as(deps, PEOPLE.cos);
     expect(err(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-20', hours: 8, reference: 'OT-1' })).code).toBe('FORBIDDEN');
     as(deps, PEOPLE.hr);
@@ -157,5 +157,41 @@ describe('wellness leave form', () => {
   it('asks for the purpose of wellness leave', () => {
     const deps = seededDeps();
     expect(err(file(deps, PEOPLE.cos, 'WELLNESS', ['2026-12-07'], {})).message).toContain('purpose');
+  });
+});
+
+describe('CTO in hours', () => {
+  it('uses the hours the applicant chose, prints them, and refuses more than the days allow or the COC left', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_saveCoc(deps, { employeeId: deps.ids.cos, earnedOn: '2026-11-02', hours: 10, reference: 'OT-7' }));
+    expect(err(file(deps, PEOPLE.cos, 'CTO', ['2026-12-07'], { hours: 9 })).message).toContain('more than the 1 working day');
+    expect(err(file(deps, PEOPLE.cos, 'CTO', ['2026-12-07', '2026-12-08'], { hours: 12 })).message).toContain('10 hours of Compensatory Time-Off (CTO) left');
+    const app = ok(file(deps, PEOPLE.cos, 'CTO', ['2026-12-07'], { hours: 4 }));
+    as(deps, PEOPLE.cos);
+    expect(ok(endpoints.api_formHtml(deps, { applicationId: app.applicationId })).html).toContain('Compensatory Time-Off (CTO), 4 hours');
+    // 4 of the 10 hours are on hold; 6 are left.
+    const cto = ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'CTO')!;
+    expect(cto.onHold).toBe(0.5);
+    expect(cto.available).toBe(0.75);
+    expect(err(file(deps, PEOPLE.cos, 'CTO', ['2026-12-09'], { hours: 6.5 })).code).toBe('VALIDATION');
+    ok(file(deps, PEOPLE.cos, 'CTO', ['2026-12-09'], { hours: 6 }));
+  });
+});
+
+describe('solo parent leave', () => {
+  it('is only for staff HR marks as solo parents, 7 days a year', () => {
+    const deps = seededDeps();
+    expect(err(file(deps, PEOPLE.staff, 'SOLO', ['2026-12-07'])).message).toContain('solo parents');
+    as(deps, PEOPLE.staff);
+    expect(ok(endpoints.api_myCredits(deps, {})).lines.some((l) => l.code === 'SOLO')).toBe(false);
+    as(deps, PEOPLE.hr);
+    const s = ok(endpoints.api_listEmployees(deps, {})).find((e) => e.email === PEOPLE.staff)!;
+    ok(endpoints.api_saveEmployee(deps, { ...s, soloParent: true }));
+    as(deps, PEOPLE.staff);
+    const line = ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'SOLO')!;
+    expect(line.available).toBe(7);
+    ok(file(deps, PEOPLE.staff, 'SOLO', ['2026-12-07', '2026-12-08', '2026-12-09', '2026-12-10', '2026-12-11']));
+    expect(err(file(deps, PEOPLE.staff, 'SOLO', ['2026-12-14', '2026-12-15', '2026-12-16'])).message).toContain('2 days of Solo Parent Leave left');
   });
 });

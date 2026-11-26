@@ -26,6 +26,8 @@ export const leaveDetails = z.object({
   otherPurpose: z.enum(['MONETIZATION', 'TERMINAL']).optional(),
   /** Wellness leave: "Purpose of Leave" on FORM-ASHRDD-031. */
   purpose: text(300).optional(),
+  /** CTO: hours of COC to use (8 make a day). */
+  hours: z.number().positive().max(8 * 366).multipleOf(0.5).optional(),
 });
 export type LeaveDetails = z.infer<typeof leaveDetails>;
 
@@ -50,6 +52,7 @@ export const leaveForm = z
         ctx.addIssue({ code: 'custom', path: ['details', 'locationText'], message: 'Specify the country' });
       }
     }
+    if (v.leaveType === 'CTO' && !v.details.hours) ctx.addIssue({ code: 'custom', path: ['details', 'hours'], message: 'Enter the hours of CTO to use' });
     if (v.leaveType === 'WELLNESS' && !v.details.purpose) ctx.addIssue({ code: 'custom', path: ['details', 'purpose'], message: 'State the purpose of the leave' });
     if (v.leaveType === 'STUDY' && !v.details.study) ctx.addIssue({ code: 'custom', path: ['details', 'study'], message: 'Choose the purpose of the study leave' });
   });
@@ -107,6 +110,7 @@ export const saveEmployeeInput = z.object({
   position: text(120).min(1, 'Required'),
   salary: text(30).optional(),
   employmentType: z.enum(EMPLOYMENT_TYPES),
+  soloParent: z.boolean().optional(),
   roles: z.array(z.enum(ROLES)).max(ROLES.length),
   isActive: z.boolean(),
 });

@@ -17,7 +17,7 @@ export const LEAVE_TYPES = [
   // Contract of service workers are not covered by the CSC leave rules. DHSUD Region 10 gives them
   // these two. CTO prints under 6.A "Others" on CSC Form No. 6; Wellness Leave prints on the
   // region's own form, FORM-ASHRDD-031 (see backend/src/services/wellnessForm.ts).
-  { code: 'CTO', label: 'Compensatory Time-Off (CTO)', basis: '', details: 'NONE', for: 'COS' },
+  { code: 'CTO', label: 'Compensatory Time-Off (CTO)', basis: '', details: 'HOURS', for: 'COS' },
   { code: 'WELLNESS', label: 'Wellness Leave', basis: '', details: 'PURPOSE', for: 'COS' },
 ] as const;
 
@@ -27,15 +27,18 @@ export const LEAVE_TYPE_CODES = LEAVE_TYPES.map((t) => t.code) as [LeaveTypeCode
 
 export type EligibleFor = (typeof LEAVE_TYPES)[number]['for'];
 
-/** The leave types a person may file: CSC leave for regular staff, CTO and Wellness for COS. */
-export function leaveTypesFor(employmentType: string) {
-  return LEAVE_TYPES.filter((t) => t.for === (employmentType === 'COS' ? 'COS' : 'REGULAR'));
+/**
+ * The leave types a person may file: CSC leave for regular staff, CTO and Wellness for COS.
+ * Solo parent leave only for those HR marked as solo parents.
+ */
+export function leaveTypesFor(e: { employmentType: string; soloParent?: boolean }) {
+  return LEAVE_TYPES.filter((t) => t.for === (e.employmentType === 'COS' ? 'COS' : 'REGULAR') && (t.code !== 'SOLO' || !!e.soloParent));
 }
 
 /** Leave printed under 6.A "Others" on CSC Form No. 6, with this text written in. */
-export function othersText(code: string, other: string): string | null {
+export function othersText(code: string, other: string, hours?: number): string | null {
   if (code === 'OTHERS') return other;
-  if (code === 'CTO') return 'Compensatory Time-Off (CTO)';
+  if (code === 'CTO') return `Compensatory Time-Off (CTO)${hours ? `, ${hours} hour${hours === 1 ? '' : 's'}` : ''}`;
   if (code === 'WELLNESS') return 'Wellness Leave';
   return null;
 }
@@ -52,6 +55,7 @@ export const CREDIT_RULES = {
   forcedLeaveDays: 5,
   splDays: 3,
   wellnessDays: 5,
+  soloParentDays: 7,
   hoursPerDay: 8,
   cocLapseMonths: 12,
 } as const;

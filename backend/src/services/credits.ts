@@ -65,7 +65,7 @@ function cocEntries(db: Db, employeeId: string): CocEntry[] {
  */
 function cocRemaining(entries: CocEntry[], approvedCto: Application[]): Map<string, number> {
   const left = new Map(entries.map((e) => [e.entryId, e.hours]));
-  const uses = approvedCto.map((a) => ({ date: a.dates[0] ?? '', hours: a.workingDays * CREDIT_RULES.hoursPerDay })).sort((a, b) => a.date.localeCompare(b.date));
+  const uses = approvedCto.map((a) => ({ date: a.dates[0] ?? '', hours: ctoHours(a) })).sort((a, b) => a.date.localeCompare(b.date));
   for (const u of uses) {
     let need = u.hours;
     for (const e of entries) {
@@ -80,6 +80,9 @@ function cocRemaining(entries: CocEntry[], approvedCto: Application[]): Map<stri
 }
 
 const days = (apps: Application[]) => apps.reduce((n, a) => n + a.workingDays, 0);
+/** Hours of COC a CTO application uses: the hours the applicant chose, or whole days for older ones. */
+export const ctoHours = (a: Application) => a.details.hours ?? a.workingDays * CREDIT_RULES.hoursPerDay;
+const hoursOf = (apps: Application[]) => apps.reduce((n, a) => n + ctoHours(a), 0);
 
 function line(code: CreditLine['code'], label: string, earned: number, used: number, onHold: number, note = ''): CreditLine {
   return { code, label, earned: round(earned), used: round(used), onHold: round(onHold), available: round(earned - used - onHold), note };
@@ -103,11 +106,11 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
     const entries = cocEntries(db, e.employeeId);
     const left = cocRemaining(entries, of(approved, 'CTO'));
     const liveHours = entries.filter((x) => addMonths(x.earnedOn, CREDIT_RULES.cocLapseMonths) > today).reduce((n, x) => n + (left.get(x.entryId) ?? 0), 0);
-    const usedHours = days(of(approved, 'CTO')) * CREDIT_RULES.hoursPerDay;
+    const usedHours = hoursOf(of(approved, 'CTO'));
     const h = CREDIT_RULES.hoursPerDay;
     // "Earned" is what is still usable plus what was used, so earned − used = unexpired COC left.
     lines.push(
-      line('CTO', 'Compensatory Time-Off (CTO)', (liveHours + usedHours) / h, usedHours / h, days(of(held, 'CTO')), `${round(liveHours)} hours of unexpired COC left (${h} hours = 1 day). COCs lapse ${CREDIT_RULES.cocLapseMonths} months after they are earned.`),
+      line('CTO', 'Compensatory Time-Off (CTO)', (liveHours + usedHours) / h, usedHours / h, hoursOf(of(held, 'CTO')) / h, `${round(liveHours)} hours of unexpired COC left (${h} hours = 1 day). COCs lapse ${CREDIT_RULES.cocLapseMonths} months after they are earned.`),
       line('WELLNESS', 'Wellness Leave', CREDIT_RULES.wellnessDays, days(of(approved, 'WELLNESS').filter(inYear)), days(of(held, 'WELLNESS').filter(inYear)), `${CREDIT_RULES.wellnessDays} days for ${year}, not carried over`),
     );
   } else {
@@ -121,6 +124,9 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
       line('FL', 'Mandatory/Forced Leave', CREDIT_RULES.forcedLeaveDays, days(of(approved, 'FL').filter(inYear)), days(of(held, 'FL').filter(inYear)), `${CREDIT_RULES.forcedLeaveDays} days to take in ${year}, taken from vacation leave`),
       line('SPL', 'Special Privilege Leave', CREDIT_RULES.splDays, days(of(approved, 'SPL').filter(inYear)), days(of(held, 'SPL').filter(inYear)), `${CREDIT_RULES.splDays} days for ${year}, not carried over`),
     );
+    if (e.soloParent) {
+      lines.push(line('SOLO', 'Solo Parent Leave', CREDIT_RULES.soloParentDays, days(of(approved, 'SOLO').filter(inYear)), days(of(held, 'SOLO').filter(inYear)), `${CREDIT_RULES.soloParentDays} days for ${year} (RA 8972), not carried over`));
+    }
   }
   return {
     employeeId: e.employeeId,

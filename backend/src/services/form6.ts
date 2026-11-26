@@ -87,7 +87,7 @@ export function renderForm6(view: Form6View): string {
   const typeRows = LEAVE_TYPES.filter((t) => t.for === 'REGULAR' && t.code !== 'OTHERS')
     .map((t) => `<div class="opt">${box(app.leaveType === t.code)}${esc(t.label)} <span class="tiny">(${esc(t.basis)})</span></div>`)
     .join('');
-  const othersLabel = othersText(app.leaveType, app.leaveTypeOther);
+  const othersLabel = othersText(app.leaveType, app.leaveTypeOther, app.details.hours);
   const others = othersLabel !== null;
   const a7 = sections['7A'];
   const b7 = sections['7B'];

@@ -24,7 +24,7 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
   const [busy, setBusy] = useState(false);
   const key = useRef(newKey());
   const credits = useLoad(() => api('api_myCredits'));
-  const types = leaveTypesFor(e.employmentType);
+  const types = leaveTypesFor(e);
   // Forced leave is charged to VL, so show both.
   const creditLines = (credits.data?.lines ?? []).filter((l) => l.code === type || (type === 'FL' && l.code === 'VL'));
 
@@ -191,6 +191,26 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
               ))}
               {errors['details.study'] && <div className="err small" style={{ color: 'var(--red)' }}>{errors['details.study']}</div>}
             </div>
+          )}
+          {kind === 'HOURS' && (
+            <Field
+              label="Hours of CTO to use"
+              error={errors['details.hours']}
+              hint={
+                working
+                  ? `8 hours make a day: up to ${working * 8} hours for the ${working} working day${working === 1 ? '' : 's'} you picked. For a half day, enter 4.`
+                  : '8 hours make a day. Pick the dates below; for a half day, enter 4.'
+              }
+            >
+              <input
+                type="number"
+                min="0.5"
+                step="0.5"
+                inputMode="decimal"
+                value={details.hours ?? ''}
+                onChange={(ev) => set({ hours: ev.target.value === '' ? undefined : Number(ev.target.value) })}
+              />
+            </Field>
           )}
           {kind === 'PURPOSE' && (
             <Field label="Purpose of leave" error={errors['details.purpose']} hint="Prints on the Wellness Leave form (FORM-ASHRDD-031).">

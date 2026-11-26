@@ -18,6 +18,7 @@ export interface EmployeeDto {
   position: string;
   salary: string;
   employmentType: EmploymentType;
+  soloParent: boolean;
   roles: Role[];
   isActive: boolean;
   hasSignature: boolean;
@@ -157,7 +158,7 @@ export interface OicDto {
   createdBy: string;
 }
 
-export type CreditCode = 'VL' | 'SL' | 'FL' | 'SPL' | 'CTO' | 'WELLNESS';
+export type CreditCode = 'VL' | 'SL' | 'FL' | 'SPL' | 'SOLO' | 'CTO' | 'WELLNESS';
 
 /** One row of a leave credits table. Figures are working days. */
 export interface CreditLine {

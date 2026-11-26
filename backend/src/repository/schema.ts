@@ -7,7 +7,7 @@ export const TABLES = {
     id: 'employee_id',
     columns: [
       'employee_id', 'email', 'last_name', 'first_name', 'middle_name', 'division_id', 'position', 'salary',
-      'employment_type', 'roles', 'signature_file_id', 'is_active', 'created_at', 'updated_at', 'version',
+      'employment_type', 'roles', 'signature_file_id', 'is_active', 'created_at', 'updated_at', 'version', 'solo_parent',
     ],
   },
   Divisions: { id: 'division_id', columns: ['division_id', 'code', 'name', 'chief_employee_id', 'no_chief', 'is_active'] },

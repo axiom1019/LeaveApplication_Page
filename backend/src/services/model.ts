@@ -17,6 +17,8 @@ export interface Employee {
   position: string;
   salary: string;
   employmentType: EmploymentType;
+  /** HR marked this person a solo parent: 7 days of solo parent leave a year (RA 8972). */
+  soloParent: boolean;
   roles: Role[];
   signatureFileId: string;
   isActive: boolean;
@@ -41,6 +43,7 @@ export function toEmployee(r: RowOf<'Employees'>): Employee {
     position: r.position,
     salary: r.salary,
     employmentType: (r.employment_type as EmploymentType) || 'REGULAR',
+    soloParent: bool(r.solo_parent ?? ''),
     roles: r.roles.split(',').map((s) => s.trim()).filter((s): s is Role => (ROLES as readonly string[]).includes(s)),
     signatureFileId: r.signature_file_id,
     isActive: bool(r.is_active),
@@ -61,6 +64,7 @@ export function employeeRow(e: Employee): RowOf<'Employees'> {
     position: e.position,
     salary: e.salary,
     employment_type: e.employmentType,
+    solo_parent: boolCell(e.soloParent),
     roles: e.roles.join(','),
     signature_file_id: e.signatureFileId,
     is_active: boolCell(e.isActive),
@@ -361,6 +365,7 @@ export function employeeDto(e: Employee, divisions: Map<string, Division>): Empl
     position: e.position,
     salary: e.salary,
     employmentType: e.employmentType,
+    soloParent: e.soloParent,
     roles: e.roles,
     isActive: e.isActive,
     hasSignature: !!e.signatureFileId,
