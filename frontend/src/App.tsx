@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BootstrapDto, SessionState } from '@shared/api';
-import { api, errorText, setToken, setUnauthenticatedHandler } from './api/client';
+import { api, errorText, setSignedOut, setToken, setUnauthenticatedHandler } from './api/client';
 import { Menu, X } from 'lucide-react';
 import barChart from 'react-useanimations/lib/barChart';
 import calendar from 'react-useanimations/lib/calendar';
@@ -101,8 +101,14 @@ export function App() {
   const signOut = async () => {
     try {
       await api('api_signOut');
+    } catch {
+      /* signed out on this browser either way */
     } finally {
+      // Also stop the server from signing the person straight back in from their Google account.
+      setSignedOut(true);
       setToken(null);
+      setBoot(null);
+      setPage('mine');
       void load();
     }
   };

@@ -12,7 +12,7 @@ import * as admin from '../services/admin';
 import * as apps from '../services/applications';
 import { listAudit } from '../services/audit';
 import * as credits from '../services/credits';
-import { currentCaller, requestCode, requireCaller, requireRole, signOut, verifyCode, type Caller } from '../services/auth';
+import { currentCaller, findActiveEmployeeByEmail, requestCode, requireCaller, requireRole, signOut, verifyCode, type Caller } from '../services/auth';
 import { AppError, isAppError } from '../services/errors';
 import { activeSignatures, employeeDto } from '../services/model';
 import { form6FileName, form6Html } from '../services/printout';
@@ -24,9 +24,11 @@ const tokenOf = (input: unknown): string | undefined => {
   const t = (input as { token?: unknown } | null)?.token;
   return typeof t === 'string' && t.length <= 200 ? t : undefined;
 };
+/** Set by the browser after Sign out: don't sign the person back in from their Google account. */
+const skipGoogleOf = (input: unknown): boolean => (input as { signedOut?: unknown } | null)?.signedOut === true;
 
 function parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
-  const { token: _t, ...rest } = (input ?? {}) as Record<string, unknown>;
+  const { token: _t, signedOut: _s, ...rest } = (input ?? {}) as Record<string, unknown>;
   const r = schema.safeParse(rest);
   if (!r.success) {
     const fields: Record<string, string> = {};
@@ -51,7 +53,7 @@ function wrap<K extends ApiName>(name: K, fn: (deps: Deps, input: unknown) => Ou
 
 /** Signed-in endpoint. */
 function authed<K extends ApiName>(name: K, fn: (deps: Deps, c: Caller, input: unknown) => Out<K>) {
-  return wrap(name, (deps, input) => fn(deps, requireCaller(deps, tokenOf(input)), input));
+  return wrap(name, (deps, input) => fn(deps, requireCaller(deps, tokenOf(input), skipGoogleOf(input)), input));
 }
 
 function buildMe(deps: Deps, c: Caller): Me {
@@ -78,9 +80,11 @@ export const endpoints: Endpoints = {
   api_session: wrap('api_session', (deps, input) => {
     const privacy = { text: PRIVACY_NOTICE.text, approved: PRIVACY_NOTICE.approved, version: PRIVACY_NOTICE.version };
     if (!deps.db.isInitialized()) return { initialized: false, me: null, googleEmail: '', denied: false, environment: deps.environment, privacy };
-    const c = currentCaller(deps, tokenOf(input));
+    const skip = skipGoogleOf(input);
+    const c = currentCaller(deps, tokenOf(input), skip);
     const googleEmail = deps.identity.activeEmail();
-    return { initialized: true, me: c ? buildMe(deps, c) : null, googleEmail, denied: !c && !!googleEmail, environment: deps.environment, privacy };
+    const googleRegistered = !!googleEmail && !!findActiveEmployeeByEmail(deps, googleEmail);
+    return { initialized: true, me: c ? buildMe(deps, c) : null, googleEmail, denied: !c && !!googleEmail && !(skip && googleRegistered), environment: deps.environment, privacy };
   }),
   api_requestCode: wrap('api_requestCode', (deps, input) => requestCode(deps, parse(S.requestCodeInput, input).email)),
   api_verifyCode: wrap('api_verifyCode', (deps, input) => {

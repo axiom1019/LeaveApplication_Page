@@ -46,6 +46,26 @@ export function setToken(t: string | null) {
   }
 }
 
+// ---- signed out: after Sign out, don't let the server sign the person in from their Google account.
+const SIGNED_OUT_KEY = 'leave.signedOut';
+let memSignedOut = false;
+export function isSignedOut(): boolean {
+  try {
+    return localStorage.getItem(SIGNED_OUT_KEY) === '1' || memSignedOut;
+  } catch {
+    return memSignedOut;
+  }
+}
+export function setSignedOut(on: boolean) {
+  memSignedOut = on;
+  try {
+    if (on) localStorage.setItem(SIGNED_OUT_KEY, '1');
+    else localStorage.removeItem(SIGNED_OUT_KEY);
+  } catch {
+    /* storage blocked: remembered until the page closes */
+  }
+}
+
 type Transport = (name: ApiName, input: unknown) => Promise<ApiResult<unknown>>;
 
 const appsScriptTransport: Transport = (name, input) =>
@@ -72,7 +92,7 @@ export const setUnauthenticatedHandler = (fn: () => void) => {
 export async function api<K extends ApiName>(name: K, input?: ApiContract[K][0]): Promise<ApiContract[K][1]> {
   const t = await transport();
   const token = getToken();
-  const res = await t(name, { ...(input ?? {}), ...(token ? { token } : {}) });
+  const res = await t(name, { ...(input ?? {}), ...(token ? { token } : {}), ...(isSignedOut() ? { signedOut: true } : {}) });
   if (!res.ok) {
     if (res.error.code === 'UNAUTHENTICATED' && name !== 'api_session') onUnauthenticated?.();
     throw new ApiCallError(res.error);

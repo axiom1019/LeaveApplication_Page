@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, errorText, setToken } from '../api/client';
+import { api, errorText, setSignedOut, setToken } from '../api/client';
 import { Centered, Field } from '../components/ui';
 
 /**
@@ -30,6 +30,7 @@ export function LoginPage(props: { googleEmail: string; denied: boolean; onSigne
     setErr('');
     try {
       const r = await api('api_verifyCode', { email, code });
+      setSignedOut(false);
       setToken(r.token);
       props.onSignedIn();
     } catch (e) {
@@ -45,6 +46,23 @@ export function LoginPage(props: { googleEmail: string; denied: boolean; onSigne
       <h1>Sign in</h1>
       <p className="lead">File CSC Form No. 6 online, print it ready to sign, and follow its status.</p>
 
+      {!props.denied && props.googleEmail && (
+        <div className="notice info">
+          You signed out. Continue as <b>{props.googleEmail}</b>, or sign in below with another registered email.
+          <div style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => {
+                setSignedOut(false);
+                props.onSignedIn();
+              }}
+            >
+              Continue as {props.googleEmail}
+            </button>
+          </div>
+        </div>
+      )}
       {props.denied && (
         <div className="notice">
           <b>{props.googleEmail}</b> is not registered for this system. Ask HR to register you, or sign in below with the email address HR registered.

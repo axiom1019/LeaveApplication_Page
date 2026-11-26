@@ -44,7 +44,7 @@ function callerFor(deps: Deps, employee: Employee, via: Caller['via']): Caller {
 }
 
 /** The signed-in caller, or null. Never throws for "not signed in". */
-export function currentCaller(deps: Deps, token: string | undefined): Caller | null {
+export function currentCaller(deps: Deps, token: string | undefined, skipGoogle = false): Caller | null {
   if (!deps.db.isInitialized()) throw new AppError('NOT_INITIALIZED', 'The system has not been set up yet.');
   if (token) {
     const employeeId = deps.cache.get(sessKey(deps, token));
@@ -54,13 +54,15 @@ export function currentCaller(deps: Deps, token: string | undefined): Caller | n
       if (emp?.isActive) return callerFor(deps, emp, 'code');
     }
   }
+  // After 'Sign out', the browser asks not to be signed in again from its Google account.
+  if (skipGoogle) return null;
   const google = deps.identity.activeEmail();
   const emp = findActiveEmployeeByEmail(deps, google);
   return emp ? callerFor(deps, emp, 'google') : null;
 }
 
-export function requireCaller(deps: Deps, token: string | undefined): Caller {
-  const c = currentCaller(deps, token);
+export function requireCaller(deps: Deps, token: string | undefined, skipGoogle = false): Caller {
+  const c = currentCaller(deps, token, skipGoogle);
   if (!c) throw new AppError('UNAUTHENTICATED', 'Please sign in again.');
   return c;
 }

@@ -103,6 +103,20 @@ describe('filing', () => {
 });
 
 describe('sign-in', () => {
+  it('stays signed out after Sign out, even when Google recognises the account, until the person continues', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.staff);
+    expect(ok(endpoints.api_session(deps, {})).me?.employee.email).toBe(PEOPLE.staff);
+    ok(endpoints.api_signOut(deps, {}));
+    const out = ok(endpoints.api_session(deps, { signedOut: true }));
+    expect(out.me).toBeNull();
+    expect(out.denied).toBe(false);
+    expect(out.googleEmail).toBe(PEOPLE.staff);
+    expect(err(endpoints.api_myApplications(deps, { signedOut: true })).code).toBe('UNAUTHENTICATED');
+    // "Continue as" drops the flag.
+    expect(ok(endpoints.api_session(deps, {})).me?.employee.email).toBe(PEOPLE.staff);
+  });
+
   it('recognises a registered govmail account and denies an unregistered one', () => {
     const deps = seededDeps();
     as(deps, PEOPLE.staff);
