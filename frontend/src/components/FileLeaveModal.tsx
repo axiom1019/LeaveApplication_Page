@@ -26,6 +26,25 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
   const key = useRef(newKey());
   const credits = useLoad(() => api('api_myCredits'));
   const types = leaveTypesFor(e);
+  // Each leave type's balance, shown beside it; types with none left are greyed out.
+  const lineOf = (code: string) => credits.data?.lines.find((l) => l.code === code);
+  const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
+  const balanceOf = (code: string): { left: number; text: string; muted?: boolean } | null => {
+    if (code === 'CTO') {
+      const l = lineOf('CTO');
+      if (!l) return null;
+      const hours = Math.max(0, l.available) * 8;
+      return { left: l.available, text: `${fmt(hours)} hour${hours === 1 ? '' : 's'} left` };
+    }
+    // Forced leave needs both its yearly 5 days and VL to take it from.
+    const codes = code === 'FL' ? ['FL', 'VL'] : [code];
+    const ls = codes.map(lineOf);
+    if (ls.some((l) => !l)) return null;
+    // VL and SL count only once HR has entered the leave card balance.
+    if ((code === 'VL' || code === 'SL' || code === 'FL') && !credits.data?.asOf) return { left: 1, text: 'balance not entered yet', muted: true };
+    const left = Math.min(...ls.map((l) => l!.available));
+    return { left, text: `${fmt(left)} day${left === 1 ? '' : 's'} left` };
+  };
   // Forced leave is charged to VL, so show both.
   const creditLines = (credits.data?.lines ?? []).filter((l) => l.code === type || (type === 'FL' && l.code === 'VL'));
 
@@ -118,23 +137,29 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
 
       <div className="section-title">6.A Type of leave</div>
       <div className="type-grid" role="radiogroup" aria-label="Type of leave">
-        {types.map((t) => (
-          <label key={t.code} className="choice">
-            <input
-              type="radio"
-              name="leaveType"
-              checked={type === t.code}
-              onChange={() => {
-                setType(t.code);
-                setDetails({});
-              }}
-            />
-            <span>
-              {t.label}
-              {t.basis && <small>{t.basis}</small>}
-            </span>
-          </label>
-        ))}
+        {types.map((t) => {
+          const b = balanceOf(t.code);
+          const empty = b !== null && b.left <= 0;
+          return (
+            <label key={t.code} className={`choice${empty ? ' is-empty' : ''}`} title={empty ? 'No credits left for this leave' : undefined}>
+              <input
+                type="radio"
+                name="leaveType"
+                checked={type === t.code}
+                disabled={empty}
+                onChange={() => {
+                  setType(t.code);
+                  setDetails({});
+                }}
+              />
+              <span>
+                {t.label}
+                {b && <span className={`left${empty || b.muted ? ' none' : ''}`}>{empty ? 'No credits left' : b.text}</span>}
+                {t.basis && <small>{t.basis}</small>}
+              </span>
+            </label>
+          );
+        })}
       </div>
       {errors.leaveType && <div className="err small" style={{ color: 'var(--red)' }}>{errors.leaveType}</div>}
       {creditLines.map((l) => (
