@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ApplicationDetail } from '@shared/api';
-import { ROLE_LABELS, WORK_SCHEDULE_INFO, creditPerDay } from '@shared/constants';
-import { countWorkingDays, formatInclusiveDates, formatLongDate, workingDates } from '@shared/dates';
+import { ROLE_LABELS, WORK_SCHEDULE_INFO } from '@shared/constants';
+import { isWorkday, leaveDays, scheduleOn } from '@shared/schedule';
+import { formatInclusiveDates, formatLongDate } from '@shared/dates';
 import { leaveTypesFor, LOCATION_CHOICES, OTHER_PURPOSE_CHOICES, SICK_CHOICES, STUDY_CHOICES, leaveType, type LeaveTypeCode } from '@shared/leaveTypes';
 import { leaveForm, type LeaveDetails } from '@shared/schemas';
 import { api, errorText, fieldErrors, newKey } from '../api/client';
@@ -29,14 +30,17 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
   const creditLines = (credits.data?.lines ?? []).filter((l) => l.code === type || (type === 'FL' && l.code === 'VL'));
 
   const holidays = useMemo(() => new Map(boot.holidays.map((h) => [h.date, h.name])), [boot.holidays]);
-  const sched = WORK_SCHEDULE_INFO[e.workSchedule];
   const holidaySet = useMemo(() => new Set(holidays.keys()), [holidays]);
-  const workDates = workingDates(dates, holidaySet, sched.weekdays);
+  // Each date counts by the schedule in force that week (skeletal or compressed).
+  const changes = me.scheduleChanges;
+  const allDays = leaveDays(dates, holidaySet, e.workSchedule, changes);
+  const workDates = allDays.workDates;
   const halfDays = (details.halfDays ?? []).filter((d) => workDates.includes(d));
-  const working = countWorkingDays(dates, holidaySet, sched.weekdays, halfDays);
-  const perDay = creditPerDay(e.workSchedule);
+  const days = leaveDays(dates, holidaySet, e.workSchedule, changes, halfDays);
+  const working = days.workingDays;
+  const sched = WORK_SCHEDULE_INFO[scheduleOn(e.workSchedule, changes, dates[0] ?? boot.today)];
   // VL, SL and forced leave are counted in 8-hour days: a compressed-week day takes 1.25.
-  const creditTaken = type === 'VL' || type === 'SL' || type === 'FL' ? Math.round(working * perDay * 1000) / 1000 : null;
+  const creditTaken = type === 'VL' || type === 'SL' || type === 'FL' ? days.creditDays : null;
   const toggleHalf = (d: string) => set({ halfDays: halfDays.includes(d) ? halfDays.filter((x) => x !== d) : [...halfDays, d].sort() });
   const kind = type ? leaveType(type).details : 'NONE';
   const set = (patch: Partial<LeaveDetails>) => setDetails((d) => ({ ...d, ...patch }));
@@ -206,7 +210,7 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
               error={errors['details.hours']}
               hint={
                 working
-                  ? `Your workday is ${sched.hours} hours: up to ${working * sched.hours} hours for the ${working} working day${working === 1 ? '' : 's'} you picked. For a half day, enter ${sched.hours / 2}.`
+                  ? `Up to ${days.hours} hours for the ${working} working day${working === 1 ? '' : 's'} you picked (${sched.hours}-hour days). For a half day, enter ${sched.hours / 2}.`
                   : `Your workday is ${sched.hours} hours. Pick the dates below; for a half day, enter ${sched.hours / 2}.`
               }
             >
@@ -242,14 +246,14 @@ export function FileLeaveModal(props: { onClose: () => void; onFiled: (app: Appl
       <div className="section-title" style={{ marginTop: 18 }}>
         6.C Inclusive dates
       </div>
-      <DatePicker value={dates} onChange={setDates} holidays={holidays} today={boot.today} weekdays={sched.weekdays} />
+      <DatePicker value={dates} onChange={setDates} holidays={holidays} today={boot.today} isWorkday={(d) => isWorkday(e.workSchedule, changes, d)} />
       <div className="days-summary" aria-live="polite">
         {dates.length ? (
           <>
             <b>{working}</b> working day{working === 1 ? '' : 's'} applied for · {formatInclusiveDates(dates)}
-            {creditTaken !== null && perDay !== 1 && (
+            {creditTaken !== null && creditTaken !== working && (
               <div className="small">
-                Takes <b>{creditTaken}</b> days of leave credit: on your compressed week a day counts as 1.25 and a half day as 0.625.
+                Takes <b>{creditTaken}</b> days of leave credit: on a compressed week a day counts as 1.25 and a half day as 0.625.
               </div>
             )}
             {workDates.length !== dates.length && <div className="small muted">Days off and holidays you picked are not counted.</div>}

@@ -1,5 +1,6 @@
-import type { DivisionDto, EmployeeDto, OicDto, SettingsDto } from '@shared/api';
-import type { Role } from '@shared/constants';
+import type { DivisionDto, EmployeeDto, OicDto, SettingsDto, WeekScheduleRow } from '@shared/api';
+import type { Role, WorkSchedule } from '@shared/constants';
+import { scheduleOn } from '@shared/schedule';
 import type { SaveEmployeeInput, SaveMyProfileInput, SettingsInput } from '@shared/schemas';
 import type { Deps } from '../platform/types';
 import { audit } from './audit';
@@ -18,6 +19,7 @@ import {
   writeSettings,
   type Division,
   type Employee,
+  loadScheduleChanges,
 } from './model';
 
 const now = (deps: Deps) => new Date(deps.nowMs()).toISOString();
@@ -302,4 +304,54 @@ export function isSignatory(deps: Deps, c: Caller): boolean {
     [...loadDivisions(db).values()].some((d) => d.chiefEmployeeId === c.employee.employeeId) ||
     db.readAll('OicAssignments').some((r) => r.employee_id === c.employee.employeeId && !r.deleted_at)
   );
+}
+
+// ---------------------------------------------------------------- weekly work schedules
+
+/** Everyone's schedule for the week starting `week` (a Monday). */
+export function weekSchedules(deps: Deps, c: Caller, week: string): WeekScheduleRow[] {
+  requireRole(c, 'HR', 'ADMIN');
+  const db = deps.db.get();
+  const divisions = loadDivisions(db);
+  const changes = loadScheduleChanges(db);
+  return [...loadEmployees(db).values()]
+    .filter((e) => e.isActive)
+    .map((e) => {
+      const list = changes.get(e.employeeId) ?? [];
+      return {
+        employeeId: e.employeeId,
+        employeeName: fullName(e),
+        divisionName: divisions.get(e.divisionId)?.name ?? '',
+        usual: e.workSchedule,
+        schedule: scheduleOn(e.workSchedule, list, week),
+        setThisWeek: list.some((x) => x.from === week),
+      };
+    })
+    .sort((a, b) => a.divisionName.localeCompare(b.divisionName) || a.employeeName.localeCompare(b.employeeName));
+}
+
+/**
+ * Sets schedules from the week starting `week`; each stays until another change. A change set
+ * again for the same week replaces the earlier one.
+ */
+export function saveWeekSchedules(deps: Deps, c: Caller, input: { week: string; changes: { employeeId: string; schedule: WorkSchedule }[] }): WeekScheduleRow[] {
+  requireRole(c, 'HR', 'ADMIN');
+  deps.lock.run(() => {
+    const db = deps.db.get();
+    const employees = loadEmployees(db);
+    const all = loadScheduleChanges(db);
+    const at = new Date(deps.nowMs()).toISOString();
+    for (const ch of input.changes) {
+      const e = employees.get(ch.employeeId);
+      if (!e) throw new AppError('NOT_FOUND', 'Employee not found.');
+      if (scheduleOn(e.workSchedule, all.get(e.employeeId) ?? [], input.week) === ch.schedule) continue;
+      for (const r of db.readAll('ScheduleChanges')) {
+        if (r.employee_id === ch.employeeId && r.effective_from === input.week && !r.deleted_at) db.replace('ScheduleChanges', r.entry_id, { ...r, deleted_at: at });
+      }
+      const entryId = deps.uuid();
+      db.append('ScheduleChanges', { entry_id: entryId, employee_id: ch.employeeId, effective_from: input.week, schedule: ch.schedule, created_by: c.employee.employeeId, created_at: at, deleted_at: '' });
+      audit(deps, c.employee.employeeId, c.email, 'SET_SCHEDULE', ch.employeeId, { week: input.week, schedule: ch.schedule });
+    }
+  });
+  return weekSchedules(deps, c, input.week);
 }

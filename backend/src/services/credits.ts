@@ -15,7 +15,7 @@ import type { Db, Deps } from '../platform/types';
 import { audit } from './audit';
 import { requireRole, type Caller } from './auth';
 import { AppError } from './errors';
-import { fullName, loadDivisions, loadEmployees, toApplication, toEmployee, type Application, type Division, type Employee } from './model';
+import { fullName, loadDivisions, loadEmployees, loadScheduleChanges, toApplication, toEmployee, type Application, type Division, type Employee } from './model';
 import { formatLongDate, manilaDate } from '@shared/dates';
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
@@ -152,7 +152,8 @@ export function creditsFor(db: Db, e: Employee, divisions: Map<string, Division>
     // Late and undertime HR recorded for months after the leave card date come off VL.
     const asOfMonth = asOf.slice(0, 7);
     const lateDays = round(tardinessEntries(db, e.employeeId).filter((t) => !asOf || t.month > asOfMonth).reduce((n, t) => n + tardinessDays(t.minutes), 0));
-    const perDay = e.workSchedule === 'COMPRESSED' ? ' Compressed week: each leave day takes 1.25 (half day 0.625).' : '';
+    const compressedAny = e.workSchedule === 'COMPRESSED' || (loadScheduleChanges(db, e.employeeId).get(e.employeeId) ?? []).some((c) => c.schedule === 'COMPRESSED');
+    const perDay = compressedAny ? ' On a compressed week each leave day takes 1.25 (half day 0.625).' : '';
     const earning = (bal: number) => (asOf ? `${bal} as of ${formatLongDate(asOf)}, plus ${CREDIT_RULES.monthlyAccrual} a month (${months} month${months === 1 ? '' : 's'})` : noRecord);
     lines.push(
       line('VL', 'Vacation Leave', asOf ? vlBalance + months * CREDIT_RULES.monthlyAccrual : 0, creditDays(of(approved, 'VL', 'FL').filter(after)) + lateDays, creditDays(of(held, 'VL', 'FL').filter(after)), `${earning(vlBalance)}. Includes forced leave${lateDays ? ` and ${lateDays} day${lateDays === 1 ? '' : 's'} for late and undertime` : ''}.${perDay}`),

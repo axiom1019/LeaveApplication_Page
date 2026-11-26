@@ -4,6 +4,7 @@ import { api, errorText, setSignedOut, setToken, setUnauthenticatedHandler } fro
 import { Menu, X } from 'lucide-react';
 import barChart from 'react-useanimations/lib/barChart';
 import calendar from 'react-useanimations/lib/calendar';
+import clock from 'react-useanimations/lib/clock';
 import edit from 'react-useanimations/lib/edit';
 import inbox from 'react-useanimations/lib/inbox';
 import list from 'react-useanimations/lib/list';
@@ -20,11 +21,12 @@ import { CreditsPage } from './pages/CreditsPage';
 import { AllApplicationsPage, InboxPage, MyLeavePage } from './pages/lists';
 import { PeoplePage } from './pages/PeoplePage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SchedulesPage } from './pages/SchedulesPage';
 import { SetupPage } from './pages/SetupPage';
 import { SignaturePage } from './pages/SignaturePage';
 import { Session, type SessionCtx } from './session';
 
-type Page = 'mine' | 'inbox' | 'all' | 'credits' | 'people' | 'setup' | 'signature' | 'profile';
+type Page = 'mine' | 'inbox' | 'all' | 'credits' | 'schedules' | 'people' | 'setup' | 'signature' | 'profile';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -86,6 +88,7 @@ export function App() {
     ['inbox', 'For my action', me.isSignatory || me.inboxCount > 0, me.inboxCount],
     ['all', 'All applications', hr],
     ['credits', 'Leave credits', hr || has('SUPERVISING_AO')],
+    ['schedules', 'Work schedules', hr],
     ['people', 'People', hr],
     ['setup', 'Setup', hr || has('REGIONAL_DIRECTOR')],
     ['signature', 'My e-signature', true],
@@ -193,6 +196,7 @@ export function App() {
                 {current === 'inbox' && <InboxPage />}
                 {current === 'all' && <AllApplicationsPage />}
                 {current === 'credits' && <CreditsPage />}
+                {current === 'schedules' && <SchedulesPage />}
                 {current === 'people' && <PeoplePage />}
                 {current === 'setup' && <SetupPage />}
                 {current === 'signature' && <SignaturePage />}
@@ -211,6 +215,7 @@ const NAV_ICONS: Record<Page, AnimatedIconData> = {
   inbox: inbox,
   all: list,
   credits: barChart,
+  schedules: clock,
   people: users,
   setup: settings,
   signature: edit,

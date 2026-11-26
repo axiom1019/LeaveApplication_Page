@@ -5,6 +5,7 @@ import type { LeaveDetails } from '@shared/schemas';
 import type { LeaveTypeCode } from '@shared/leaveTypes';
 import { bool, boolCell, int } from '../repository/cells';
 import type { RowOf } from '../repository/schema';
+import type { ScheduleChange } from '@shared/schedule';
 import type { Db, Deps } from '../platform/types';
 
 export interface Employee {
@@ -384,3 +385,16 @@ export function employeeDto(e: Employee, divisions: Map<string, Division>): Empl
 
 export const loadEmployees = (db: Db) => new Map(db.readAll('Employees').map((r) => [r.employee_id, toEmployee(r)]));
 export const loadDivisions = (db: Db) => new Map(db.readAll('Divisions').map((r) => [r.division_id, toDivision(r)]));
+
+/** A person's schedule changes, oldest first (see shared/schedule.ts). */
+export function loadScheduleChanges(db: Db, employeeId?: string): Map<string, ScheduleChange[]> {
+  const out = new Map<string, ScheduleChange[]>();
+  for (const r of db.readAll('ScheduleChanges')) {
+    if (r.deleted_at || (employeeId && r.employee_id !== employeeId)) continue;
+    const list = out.get(r.employee_id) ?? [];
+    list.push({ from: r.effective_from, schedule: r.schedule === 'COMPRESSED' ? 'COMPRESSED' : 'STANDARD' });
+    out.set(r.employee_id, list);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.from.localeCompare(b.from));
+  return out;
+}

@@ -14,7 +14,7 @@ import { listAudit } from '../services/audit';
 import * as credits from '../services/credits';
 import { currentCaller, findActiveEmployeeByEmail, requestCode, requireCaller, requireRole, signOut, verifyCode, type Caller } from '../services/auth';
 import { AppError, isAppError } from '../services/errors';
-import { activeSignatures, employeeDto } from '../services/model';
+import { activeSignatures, employeeDto, loadScheduleChanges } from '../services/model';
 import { form6FileName, form6Html } from '../services/printout';
 
 type Out<K extends ApiName> = ApiContract[K][1];
@@ -62,6 +62,7 @@ function buildMe(deps: Deps, c: Caller): Me {
   return {
     employee: employeeDto(c.employee, ctx.divisions),
     isOicToday: apps.oicOn(ctx, ctx.today).some((o) => o.employeeId === c.employee.employeeId),
+    scheduleChanges: loadScheduleChanges(ctx.db, c.employee.employeeId).get(c.employee.employeeId) ?? [],
     isOwner: c.isOwner,
     isSignatory: admin.isSignatory(deps, c),
     canFile: !block,
@@ -165,6 +166,8 @@ export const endpoints: Endpoints = {
   api_listCoc: authed('api_listCoc', (deps, c, input) => credits.listCoc(deps, c, parse(S.employeeRef, input).employeeId)),
   api_saveCoc: authed('api_saveCoc', (deps, c, input) => credits.saveCoc(deps, c, parse(S.saveCocInput, input))),
   api_deleteCoc: authed('api_deleteCoc', (deps, c, input) => credits.deleteCoc(deps, c, parse(S.deleteCocInput, input).entryId)),
+  api_weekSchedules: authed('api_weekSchedules', (deps, c, input) => admin.weekSchedules(deps, c, parse(S.weekRef, input).week)),
+  api_saveWeekSchedules: authed('api_saveWeekSchedules', (deps, c, input) => admin.saveWeekSchedules(deps, c, parse(S.saveWeekSchedulesInput, input))),
   api_listTardiness: authed('api_listTardiness', (deps, c, input) => credits.listTardiness(deps, c, parse(S.employeeRef, input).employeeId)),
   api_saveTardiness: authed('api_saveTardiness', (deps, c, input) => credits.saveTardiness(deps, c, parse(S.saveTardinessInput, input))),
   api_deleteTardiness: authed('api_deleteTardiness', (deps, c, input) => credits.deleteTardiness(deps, c, parse(S.deleteTardinessInput, input).entryId)),

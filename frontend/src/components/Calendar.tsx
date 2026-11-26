@@ -8,9 +8,8 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
  * Pick inclusive dates. Click a day to add or remove it; Shift-click (or use "Select range")
  * to add every day from the last one picked. Days off (weekends, or Fridays on a compressed week) and holidays are shown but not counted.
  */
-export function DatePicker(props: { value: string[]; onChange: (v: string[]) => void; holidays: Map<string, string>; today: string; weekdays?: readonly number[] }) {
-  const workdays = props.weekdays ?? [1, 2, 3, 4, 5];
-  const isOff = (d: string) => !workdays.includes(weekday(d));
+export function DatePicker(props: { value: string[]; onChange: (v: string[]) => void; holidays: Map<string, string>; today: string; isWorkday?: (d: string) => boolean }) {
+  const isOff = (d: string) => (props.isWorkday ? !props.isWorkday(d) : weekday(d) === 0 || weekday(d) === 6);
   const [month, setMonth] = useState(() => (props.value[0] ?? props.today).slice(0, 7));
   const [anchor, setAnchor] = useState<string | null>(null);
   const [rangeMode, setRangeMode] = useState(false);

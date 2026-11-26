@@ -169,7 +169,7 @@ function EmployeeForm(props: { person: EmployeeDto | null; divisions: DivisionDt
         </Field>
         {text('position', 'Position')}
         {text('salary', 'Salary', 'As printed on item 5 of the form')}
-        <Field label="Work schedule" error={errors.workSchedule} hint="Compressed: a leave day takes 1.25 days of VL/SL credit, a half day 0.625.">
+        <Field label="Usual work schedule" error={errors.workSchedule} hint="Week-by-week changes go under Work schedules. Compressed: a leave day takes 1.25 of VL/SL, a half day 0.625.">
           <select value={f.workSchedule} onChange={(e) => set({ workSchedule: e.target.value as WorkSchedule })}>
             {WORK_SCHEDULES.map((w) => (
               <option key={w} value={w}>

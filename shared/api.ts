@@ -1,5 +1,6 @@
 import type { ApplicationStatus, EmploymentType, WorkSchedule, ErrorCode, LeaveCreditsMode, Role, Section, SignMethod, Signatory } from './constants';
 import type { LeaveTypeCode } from './leaveTypes';
+import type { ScheduleChange } from './schedule';
 import type { z } from 'zod';
 import type * as S from './schemas';
 
@@ -52,6 +53,8 @@ export interface Me {
   employee: EmployeeDto;
   /** Roles plus the derived ones: OIC (assigned for today) and OWNER (deploying account). */
   isOicToday: boolean;
+  /** The person's work schedule changes (their usual schedule is employee.workSchedule). */
+  scheduleChanges: ScheduleChange[];
   isOwner: boolean;
   /** Signs something: has a signatory role, chairs a division, or has been named OIC. */
   isSignatory: boolean;
@@ -187,6 +190,17 @@ export interface CreditsDto {
   lines: CreditLine[];
 }
 
+/** One person's work schedule for a week (HR's weekly schedule page). */
+export interface WeekScheduleRow {
+  employeeId: string;
+  employeeName: string;
+  divisionName: string;
+  usual: WorkSchedule;
+  schedule: WorkSchedule;
+  /** True when this week's schedule was set for this very week (not carried over). */
+  setThisWeek: boolean;
+}
+
 /** A month's late and undertime HR recorded, and the VL it takes. */
 export interface TardinessDto {
   entryId: string;
@@ -257,6 +271,8 @@ export interface ApiContract {
   api_listCoc: [In<typeof S.employeeRef>, CocDto[]];
   api_saveCoc: [In<typeof S.saveCocInput>, CocDto[]];
   api_deleteCoc: [In<typeof S.deleteCocInput>, CocDto[]];
+  api_weekSchedules: [In<typeof S.weekRef>, WeekScheduleRow[]];
+  api_saveWeekSchedules: [In<typeof S.saveWeekSchedulesInput>, WeekScheduleRow[]];
   api_listTardiness: [In<typeof S.employeeRef>, TardinessDto[]];
   api_saveTardiness: [In<typeof S.saveTardinessInput>, TardinessDto[]];
   api_deleteTardiness: [In<typeof S.deleteTardinessInput>, TardinessDto[]];

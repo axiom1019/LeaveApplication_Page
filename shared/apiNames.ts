@@ -37,6 +37,8 @@ export const API_NAMES = [
   'api_listCoc',
   'api_saveCoc',
   'api_deleteCoc',
+  'api_weekSchedules',
+  'api_saveWeekSchedules',
   'api_listTardiness',
   'api_saveTardiness',
   'api_deleteTardiness',

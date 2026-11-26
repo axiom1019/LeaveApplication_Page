@@ -183,6 +183,13 @@ export const saveCocInput = z.object({
 });
 export const deleteCocInput = z.object({ entryId: id });
 
+const monday = isoDate.refine((d) => new Date(`${d}T00:00:00Z`).getUTCDay() === 1, 'Choose a Monday');
+export const weekRef = z.object({ week: monday });
+export const saveWeekSchedulesInput = z.object({
+  week: monday,
+  changes: z.array(z.object({ employeeId: id, schedule: z.enum(WORK_SCHEDULES) })).max(500),
+});
+
 export const saveTardinessInput = z.object({
   employeeId: id,
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Choose the month'),

@@ -285,3 +285,26 @@ describe('work schedules, half days and late deductions', () => {
     expect(err(endpoints.api_saveTardiness(deps, { employeeId: deps.ids.cos, month: '2026-10', minutes: 10 })).message).toContain('COS');
   });
 });
+
+describe('schedules that change week to week', () => {
+  it('counts each leave date by the schedule HR set for its week', () => {
+    const deps = seededDeps();
+    as(deps, PEOPLE.hr);
+    ok(endpoints.api_saveCredits(deps, { employeeId: deps.ids.staff, asOf: '2026-11-30', vlBalance: 10, slBalance: 10 }));
+    // Compressed for the week of Dec 7, back to skeletal from Dec 14.
+    ok(endpoints.api_saveWeekSchedules(deps, { week: '2026-12-07', changes: [{ employeeId: deps.ids.staff, schedule: 'COMPRESSED' }] }));
+    const wk = ok(endpoints.api_saveWeekSchedules(deps, { week: '2026-12-14', changes: [{ employeeId: deps.ids.staff, schedule: 'STANDARD' }] }));
+    expect(wk.find((r) => r.employeeId === deps.ids.staff)!.schedule).toBe('STANDARD');
+    expect(ok(endpoints.api_weekSchedules(deps, { week: '2026-12-07' })).find((r) => r.employeeId === deps.ids.staff)!.schedule).toBe('COMPRESSED');
+    // Thu 10 + Fri 11 (compressed week: Fri off) and Thu 17 + Fri 18 (skeletal week).
+    const app = ok(file(deps, PEOPLE.staff, 'VL', ['2026-12-10', '2026-12-11', '2026-12-17', '2026-12-18'], { location: 'PH' }));
+    expect(app.workingDays).toBe(3);
+    as(deps, PEOPLE.staff);
+    expect(ok(endpoints.api_myCredits(deps, {})).lines.find((l) => l.code === 'VL')!.onHold).toBe(3.25);
+    expect(ok(endpoints.api_session(deps, {})).me!.scheduleChanges.map((c) => c.from)).toEqual(['2026-12-07', '2026-12-14']);
+    // Only HR and administrators set schedules; weeks start on Monday.
+    expect(err(endpoints.api_saveWeekSchedules(deps, { week: '2026-12-07', changes: [] })).code).toBe('FORBIDDEN');
+    as(deps, PEOPLE.hr);
+    expect(err(endpoints.api_weekSchedules(deps, { week: '2026-12-08' })).code).toBe('VALIDATION');
+  });
+});

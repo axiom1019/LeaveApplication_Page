@@ -1,6 +1,7 @@
 import type { ApplicationDetail, ApplicationSummary, SettingsDto, SignatureDto, StepDto } from '@shared/api';
-import { WORK_SCHEDULE_INFO, creditPerDay, ROLE_LABELS, SECTION_LABELS, STATUS_LABELS, type Section } from '@shared/constants';
-import { countWorkingDays, formatInclusiveDates, manilaDate, manilaDateTime, normalizeDates, workingDates } from '@shared/dates';
+import { WORK_SCHEDULE_INFO, ROLE_LABELS, SECTION_LABELS, STATUS_LABELS, type Section } from '@shared/constants';
+import { formatInclusiveDates, manilaDate, manilaDateTime, normalizeDates } from '@shared/dates';
+import { leaveDays } from '@shared/schedule';
 import { CREDIT_RULES, leaveType, leaveTypesFor } from '@shared/leaveTypes';
 import { creditsFor } from './credits';
 import type { LeaveForm, SignInput } from '@shared/schemas';
@@ -15,6 +16,7 @@ import {
   fullName,
   loadDivisions,
   loadEmployees,
+  loadScheduleChanges,
   readSettings,
   signatureRow,
   toApplication,
@@ -265,7 +267,7 @@ export function filingBlock(ctx: Ctx, e: Employee): string {
 const CLOSED = new Set(['CANCELLED', 'DISAPPROVED']);
 
 /** Refuses leave types the person is not entitled to, and CTO, wellness, SPL or solo parent leave beyond what is left. */
-function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], workingDays: number, all: Application[], hours?: number) {
+function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], workingDays: number, all: Application[], hours?: number, maxHours?: number) {
   if (!leaveTypesFor(me).some((t) => t.code === code)) {
     const msg =
       me.employmentType === 'COS'
@@ -275,9 +277,9 @@ function checkCredits(ctx: Ctx, me: Employee, code: string, dates: string[], wor
           : 'Wellness Leave is for contract of service staff.';
     throw new AppError('VALIDATION', msg, { fields: { leaveType: msg } });
   }
-  const dayHours = WORK_SCHEDULE_INFO[me.workSchedule].hours;
-  if (code === 'CTO' && hours !== undefined && hours > workingDays * dayHours) {
-    const msg = `${hours} hours is more than the ${workingDays} working day${workingDays === 1 ? '' : 's'} you picked (${workingDays * dayHours} hours).`;
+  const cap = maxHours ?? workingDays * WORK_SCHEDULE_INFO[me.workSchedule].hours;
+  if (code === 'CTO' && hours !== undefined && hours > cap) {
+    const msg = `${hours} hours is more than the ${workingDays} working day${workingDays === 1 ? '' : 's'} you picked (${cap} hours).`;
     throw new AppError('VALIDATION', msg, { fields: { 'details.hours': msg } });
   }
   if (!['CTO', 'WELLNESS', 'SPL', 'SOLO'].includes(code)) return;
@@ -319,23 +321,23 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
     if (block) throw new AppError('FORBIDDEN', block);
 
     const dates = normalizeDates(form.dates);
-    const sched = WORK_SCHEDULE_INFO[me.workSchedule];
-    const workDates = workingDates(dates, ctx.holidays, sched.weekdays);
+    // Each date counts by the work schedule in force that week (skeletal or compressed).
+    const changes = loadScheduleChanges(ctx.db, me.employeeId).get(me.employeeId) ?? [];
     const halfDays = normalizeDates(form.details.halfDays ?? []);
-    if (halfDays.some((d) => !workDates.includes(d))) {
+    const days = leaveDays(dates, ctx.holidays, me.workSchedule, changes, halfDays);
+    if (halfDays.some((d) => !days.workDates.includes(d))) {
       throw new AppError('VALIDATION', 'A half day must be one of your working days in the dates picked.', { fields: { 'details.halfDays': 'Pick half days among your working days' } });
     }
-    const workingDays = countWorkingDays(dates, ctx.holidays, sched.weekdays, halfDays);
+    const workingDays = days.workingDays;
     if (workingDays === 0 && form.leaveType !== 'ML') {
-      const off = me.workSchedule === 'COMPRESSED' ? 'days off (Friday to Sunday on your compressed week)' : 'weekends';
-      throw new AppError('VALIDATION', `The dates you picked are all ${off} or holidays.`, { fields: { dates: 'Pick at least one working day' } });
+      throw new AppError('VALIDATION', 'The dates you picked are all days off or holidays.', { fields: { dates: 'Pick at least one working day' } });
     }
     const mine = new Set(dates);
     const clash = existing.find((a) => a.applicantId === me.employeeId && !CLOSED.has(a.status) && a.dates.some((d) => mine.has(d)));
     if (clash) {
       throw new AppError('CONFLICT', `You already have leave application ${clash.applicationId} covering some of these dates.`, { fields: { dates: 'Overlaps another application' } });
     }
-    checkCredits(ctx, me, form.leaveType, dates, workingDays, existing, form.leaveType === 'CTO' ? form.details.hours : undefined);
+    checkCredits(ctx, me, form.leaveType, dates, workingDays, existing, form.leaveType === 'CTO' ? form.details.hours : undefined, days.hours);
 
     const year = ctx.today.slice(0, 4);
     const prefix = `LA-${year}-`;
@@ -373,7 +375,7 @@ export function fileLeave(deps: Deps, c: Caller, idempotencyKey: string, form: L
       details,
       dates,
       workingDays,
-      creditDays: Math.round(workingDays * creditPerDay(me.workSchedule) * 1000) / 1000,
+      creditDays: days.creditDays,
       commutation: form.commutation,
       flow: flowFor(ctx, me),
       currentStep: 0,

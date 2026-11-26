@@ -37,6 +37,11 @@ export const TABLES = {
     id: 'entry_id',
     columns: ['entry_id', 'employee_id', 'earned_on', 'hours', 'reference', 'created_by', 'created_at', 'deleted_at'],
   },
+  /** Work schedule changes: from `effective_from` (a Monday) the person works `schedule`. */
+  ScheduleChanges: {
+    id: 'entry_id',
+    columns: ['entry_id', 'employee_id', 'effective_from', 'schedule', 'created_by', 'created_at', 'deleted_at'],
+  },
   /** Tardiness and undertime HR records per month, deducted from VL (CSC MC No. 16, s. 2010). */
   Tardiness: {
     id: 'entry_id',
